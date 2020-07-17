@@ -1,3 +1,7 @@
+/**
+  * 卷积的相关类以及柯里化方法
+  */
+
 #ifndef CONVOLUTION_H
 #define CONVOLUTION_H
 

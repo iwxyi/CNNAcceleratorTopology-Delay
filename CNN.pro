@@ -24,4 +24,5 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 HEADERS += \
     convolution.h \
-    delaydefine.h
+    delaydefine.h \
+    layerthread.h
