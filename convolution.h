@@ -1,5 +1,5 @@
 /**
-  * å·ç§¯çš„ç›¸å…³ç±»ä»¥åŠæŸ¯é‡ŒåŒ–æ–¹æ³•
+  * ¾í»ıµÄÏà¹ØÀàÒÔ¼°¿ÂÀï»¯·½·¨
   */
 
 #ifndef CONVOLUTION_H
@@ -7,18 +7,18 @@
 
 #include <windows.h>
 
-// ==================== å°ºå¯¸å®šä¹‰ ===================
-#define MAP_SIDE_MAX 224     // ç‰¹å¾å›¾è¾¹é•¿çš„æœ€å¤§
-#define MAP_CHANNEL_DEFULT 3 // ç‰¹å¾å›¾é€šé“é»˜è®¤æ•°é‡ RGB
-#define KERNEL_SIDE 3        // å·ç§¯æ ¸å›ºå®šè¾¹é•¿
-#define KERNEL_MAX_COUNT 32  // å·ç§¯æ ¸æœ€å¤§æ•°é‡
-#define MAX_LAYER 32         // æœ€å¤šçš„å±‚æ•°ï¼ˆ32è¿˜æ˜¯128ï¼‰
+// ==================== ³ß´ç¶¨Òå ===================
+#define MAP_SIDE_MAX 224     // ÌØÕ÷Í¼±ß³¤µÄ×î´ó
+#define MAP_CHANNEL_DEFULT 3 // ÌØÕ÷Í¼Í¨µÀÄ¬ÈÏÊıÁ¿ RGB
+#define KERNEL_SIDE 3        // ¾í»ıºË¹Ì¶¨±ß³¤
+#define KERNEL_MAX_COUNT 32  // ¾í»ıºË×î´óÊıÁ¿
+#define MAX_LAYER 32         // ×î¶àµÄ²ãÊı£¨32»¹ÊÇ128£©
 
 
 /**
- * åˆ›å»ºå›ºå®šå¤§å°çš„ä¸‰ç»´æ•°ç»„
- * è®°å¾—æ‰‹åŠ¨delete[]ï¼Œå…å¾—å†…å­˜æ³„æ¼
- * å¦‚æœè¦ä¼˜åŒ–é€Ÿåº¦ï¼Œå¯ä»¥æŠŠZæ”¾åœ¨æœ€å¤–å±‚å¾ªç¯
+ * ´´½¨¹Ì¶¨´óĞ¡µÄÈıÎ¬Êı×é
+ * ¼ÇµÃÊÖ¶¯delete[]£¬ÃâµÃÄÚ´æĞ¹Â©
+ * Èç¹ûÒªÓÅ»¯ËÙ¶È£¬¿ÉÒÔ°ÑZ·ÅÔÚ×îÍâ²ãÑ­»·
  */
 INT8*** create3D(int y, int x, int z)
 {
@@ -38,8 +38,8 @@ INT8*** create3D(int y, int x, int z)
 
 
 /**
- * å›¾ç±»
- * åŒ…å«äº†æ ‡å·å’Œå›¾çš„å±‚æ•°
+ * Í¼Àà
+ * °üº¬ÁË±êºÅºÍÍ¼µÄ²ãÊı
  */
 struct FeatureMap {
     FeatureMap(){}
@@ -58,7 +58,7 @@ struct FeatureMap {
         this->channel = map->channel;
         initMap();
 //        printf("initMap finished: %d, %d, %d  %d~%d\n", side, side, channel, this->map[side-1][side-1][channel-1], map->map[side-1][side-1][channel-1]);
-//        memcpy(this->map, map->map, sizeof(INT8)*side*side*channel); // è«åçš„å´©æºƒ
+//        memcpy(this->map, map->map, sizeof(INT8)*side*side*channel); // ÄªÃûµÄ±ÀÀ£
 //        printf("memcpy finished\n");
         for (int y = 0; y < side; y++)
             for (int x = 0; x < side; x++)
@@ -81,14 +81,14 @@ struct FeatureMap {
         }
     }
 
-    int kernel = 0;     // kernel æ ‡å·ã€‚è¢«æ»‘çš„å›¾ä¸éœ€è¦è¿™é¡¹
-    int side = 0;       // å›¾çš„è¾¹é•¿ï¼ˆæ­£æ–¹å½¢ï¼‰
-    int channel = 0;    // å›¾çš„channelæ•°é‡
-    INT8 ***map = NULL; // å›¾ï¼šä¸ºäº†éå†æ–¹ä¾¿ï¼Œä¸ºï¼šmap[channel][side][side]
+    int kernel = 0;     // kernel ±êºÅ¡£±»»¬µÄÍ¼²»ĞèÒªÕâÏî
+    int side = 0;       // Í¼µÄ±ß³¤£¨Õı·½ĞÎ£©
+    int channel = 0;    // Í¼µÄchannelÊıÁ¿
+    INT8 ***map = NULL; // Í¼£ºÎªÁË±éÀú·½±ã£¬Îª£ºmap[channel][side][side]
 
     /**
-     * åˆå§‹åŒ–å›¾ï¼Œå…¨éƒ¨éƒ½é»˜è®¤0
-     * @param m ä¼ è¿›æ¥çš„å›¾ï¼Œå¦‚æœä¸ºNULLåˆ™å…¨éƒ¨è®¾ç½®æˆ0
+     * ³õÊ¼»¯Í¼£¬È«²¿¶¼Ä¬ÈÏ0
+     * @param m ´«½øÀ´µÄÍ¼£¬Èç¹ûÎªNULLÔòÈ«²¿ÉèÖÃ³É0
      */
     void initMap(INT8***m = NULL)
     {
@@ -98,7 +98,7 @@ struct FeatureMap {
 
 
 /**
- * å·ç§¯æ ¸ç±»
+ * ¾í»ıºËÀà
  */
 struct Kernel {
     Kernel(): side(3), channel(3) {}
@@ -107,13 +107,13 @@ struct Kernel {
     {
         initKernel();
     }
-    int side;    // è¾¹é•¿ side * side
-    int channel; // ç­‰äºå½“å‰è¢«æ»‘åŠ¨çš„å›¾çš„channelæ•°é‡
-    INT8 ***bits = NULL; // æ¯ä¸€ä½çš„å€¼
+    int side;    // ±ß³¤ side * side
+    int channel; // µÈÓÚµ±Ç°±»»¬¶¯µÄÍ¼µÄchannelÊıÁ¿
+    INT8 ***bits = NULL; // Ã¿Ò»Î»µÄÖµ
 
     /**
-     * åˆå§‹åŒ–kernel
-     * @param k å¦‚æœä¸ºNULLï¼Œåˆ™å…¨éƒ¨ä¸º0
+     * ³õÊ¼»¯kernel
+     * @param k Èç¹ûÎªNULL£¬ÔòÈ«²¿Îª0
      */
     void initKernel(INT8*** k = NULL)
     {
@@ -123,24 +123,24 @@ struct Kernel {
 
 
 /**
- * çº¿ç¨‹ä¼ é€’å‚æ•°ç±»
+ * Ïß³Ì´«µİ²ÎÊıÀà
  * kernel.channel == image.channel
- * kernel.filter = ä¸‹ä¸€å±‚ image.channel
+ * kernel.filter = ÏÂÒ»²ã image.channel
  */
 struct ConvThreadArg {
     ConvThreadArg(){}
     ConvThreadArg(int layer, int k, FeatureMap *img, Kernel *kernel)
         : layer(layer), k_indx(k), map(img), kernel(kernel)
     {}
-    int layer = 0;          // å½“å‰æ˜¯ç¬¬å‡ å±‚
-    int k_indx = 0;         // æ ¸çš„ç´¢å¼•ï¼Œä¼ ç»™ä¸‹ä¸€ä¸ªæ ¸
-    FeatureMap *map = NULL; // å›¾çš„å¯¹è±¡æŒ‡é’ˆ
-    Kernel *kernel;         // å·ç§¯æ ¸çš„è¾¹é•¿
+    int layer = 0;          // µ±Ç°ÊÇµÚ¼¸²ã
+    int k_indx = 0;         // ºËµÄË÷Òı£¬×îÖÕÓëÆäËûºË£¨°´Ë³Ğò£¿£©ºÏ²¢
+    FeatureMap *map = NULL; // Í¼µÄ¶ÔÏóÖ¸Õë
+    Kernel *kernel;         // ¾í»ıºËµÄ±ß³¤
 };
 
 
 /**
- * è¿›è¡Œå·ç§¯çš„è®¡ç®—å‡½æ•°
+ * ½øĞĞ¾í»ıµÄ¼ÆËãº¯Êı
  */
 FeatureMap* convolution(FeatureMap *image, Kernel *kernel)
 {
@@ -148,13 +148,13 @@ FeatureMap* convolution(FeatureMap *image, Kernel *kernel)
     FeatureMap* result = new FeatureMap(image->kernel, new_side, 1);
     INT8*** map = result->map;
 
-    // ç´¯åŠ ï¼ˆæ³¨æ„ï¼šè¿™é‡Œåæ ‡åç€çš„ï¼Œå…ˆæ˜¯yï¼Œå†æ˜¯xï¼‰
+    // ÀÛ¼Ó£¨×¢Òâ£ºÕâÀï×ø±ê·´×ÅµÄ£¬ÏÈÊÇy£¬ÔÙÊÇx£©
     for (int y = 0; y < new_side; y++)
     {
         for (int x = 0; x < new_side; x++)
         {
-            // æ–°å›¾çš„ä½ç½®ï¼šmap[y][x][ch]
-            // TODOï¼šè¿™é‡Œå¯ä»¥åŠ ä¸ªç¼“å­˜æ¥åŠ å¿«é€Ÿåº¦
+            // ĞÂÍ¼µÄÎ»ÖÃ£ºmap[y][x][ch]
+            // TODO£ºÕâÀï¿ÉÒÔ¼Ó¸ö»º´æÀ´¼Ó¿ìËÙ¶È
             INT8& v = map[y][x][0];
             for (int i = 0; i < kernel->side; i++)
                 for (int j = 0; j < kernel->side; j++)

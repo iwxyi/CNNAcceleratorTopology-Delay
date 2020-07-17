@@ -1,12 +1,12 @@
 #ifndef DELAYDEFINE_H
 #define DELAYDEFINE_H
 
-#define Dly_SlideCube 1     // 姣忔婊戝姩灏忔柟鍧楃殑delay
-#define Dly_Cube2RegFIFO 1  // 姣忎釜鏁版嵁鍒癛equestQueue閲岄潰鐨刣elay
-#define Dly_Cube2DatLatch 1 // 姣忎釜鏁版嵁鍒癉ataLatch閲岄潰鐨刣elay
-#define Dly_RegPick2Conv 1  // ReqQueue閲屾瘡涓暟鎹甈ick鍘诲嵎绉殑delay
-#define Dly_DatPick2Conv 1  // DatQueue閲屾瘡涓暟鎹甈ick鍘诲嵎绉殑delay
-#define Dly_Conv2SndFIFO 1  // 鍗风Н鍚庤繘鍏ndFIFO鐨刣elay
-#define Dly_Snd2NextPE 1    // Send鑷充笅涓�灞侾E鐨刣elay
+#define Dly_SlideCube 1     // 每次滑动小方块的delay
+#define Dly_Cube2RegFIFO 1  // 每个数据到RequestQueue里面的delay
+#define Dly_Cube2DatLatch 1 // 每个数据到DataLatch里面的delay
+#define Dly_RegPick2Conv 1  // ReqQueue里每个数据Pick去卷积的delay
+#define Dly_DatPick2Conv 1  // DatQueue里每个数据Pick去卷积的delay
+#define Dly_Conv2SndFIFO 1  // 卷积后进入SndFIFO的delay
+#define Dly_Snd2NextPE 1    // Send至下一层PE的delay
 
 #endif // DELAYDEFINE_H
