@@ -199,7 +199,6 @@ void generalNextLayerMap()
 // ==================== 流程控制 ===================
 // 函数前置声明
 void inClock();
-void dataOperator();
 void dataTransfer();
 void clockGoesBy();
 
@@ -235,33 +234,23 @@ void runFlowControl()
 void inClock()
 {
     global_clock++;
-    picker_bandwdith = Picker_FullBandwidth;
+    picker_bandwdith = Picker_FullBandwidth; // bandwidth满载
 
-    dataOperator();
-
-    dataTransfer();
-
-    clockGoesBy();
-}
-
-/**
- * 数据操作
- * 各种数据分割啊，特征合并啊，一个clock能做的事都在这儿
- */
-void dataOperator()
-{
     // 开启新的一层，分割特征图
     if (feature_map)
     {
         startNewLayer();
     }
 
-    // 每个卷积核进行计算
-    // 不用计算了，结果不重要，全部0吧
+    dataTransfer();
 
-    // 如果SndFIFO结果已经满了，即新的特征图已经出来
-    // 合并特征图，转至Switch，最后传到下一层
-    // ...
+    clockGoesBy();
+
+    // 判断全部的点是否传输结束
+    if (conved_points >= total_points)
+    {
+        generalNextLayerMap();
+    }
 }
 
 /**
@@ -318,12 +307,13 @@ void dataTransfer()
             PickQueue.push_back(packet); // 进入Pick延迟
             ReqQueue.erase(ReqQueue.begin() + i--);
             packet->resetDelay(Dly_onPick);
-            DEB("正在 pick 至 Conv %d\n", picker_tagret);
+            DEB("正在 pick 至 Conv %d, 剩余bandwidth:%d\n", picker_tagret, picker_bandwdith-1);
 
             // 发送后各种数值的变化
             picker_bandwdith--;
             pickNextTarget();
             has_transfered = true;
+            break;
         }
     }
 
@@ -418,6 +408,7 @@ void dataTransfer()
         Conv2SndFIFO.erase(Conv2SndFIFO.begin() + i--);
         SndQueue.push_back(packet);
         packet->resetDelay(Dly_inSndFIFO);
+        DEB("Conv => SndFIFO delay\n");
         has_transfered = true;
     }
 
@@ -431,6 +422,7 @@ void dataTransfer()
         SndQueue.erase(SndQueue.begin() + i--);
         Snd2SwitchFIFO.push_back(packet);
         packet->resetDelay(Dly_Snd2Switch);
+        DEB("SndFIFO => Switch\n");
         has_transfered = true;
     }
 
@@ -444,6 +436,7 @@ void dataTransfer()
         Snd2SwitchFIFO.erase(Snd2SwitchFIFO.begin() + i--);
         SwitchQueue.push_back(packet);
         packet->resetDelay(Dly_inSwitch);
+        DEB("SndFIFO => Switch delay\n");
         has_transfered = true;
     }
 
@@ -457,16 +450,18 @@ void dataTransfer()
         SwitchQueue.erase(SwitchQueue.begin() + i--);
         Switch2NextLayer.push_back(packet);
         packet->resetDelay(Dly_Switch2NextPE);
+        DEB("Switch => NextLayer\n");
         has_transfered = true;
     }
 
     for (int i = 0; i < Switch2NextLayer.size(); i++)
     {
-        DataPacket* packet = SwitchQueue.at(i);
+        DataPacket* packet = Switch2NextLayer.at(i);
         if (!packet->isDelayFinished())
             continue;
 
         Switch2NextLayer.erase(Switch2NextLayer.begin() + i--);
+        conved_points++;
         has_transfered = true;
     }
 
