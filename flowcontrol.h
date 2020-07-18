@@ -36,6 +36,9 @@ ClockType global_clock = 0;
 bool has_transfered = false;
 int picker_bandwdith = Picker_FullBandwidth; // pick的最大bandwidth
 int picker_tagret = 0; // picker下一次pick的目标，0~layer_kernel-1。如果不行，则跳过
+int current_map_side = 0; // 当前图像的大小
+long long total_points = 0; // 总共参与卷积的点
+long long conved_points = 0; // 已经卷积并且结束的点。如果两者相等，则表示当前层已经结束了
 
 // ==================== 各种队列 ===================
 FIFO StartQueue; // 特征图的每一点生成后的总队列
@@ -46,6 +49,9 @@ FIFO PickQueue; // pick后进行delay的队列
 FIFO ConvQueue[KERNEL_MAX_COUNT]; // 每个卷积结果队列
 FIFO Conv2SndFIFO; // Conv => SndFIFO
 FIFO SndQueue;   // 合并后的数据队列，发送到下一层
+FIFO Snd2SwitchFIFO;
+FIFO SwitchQueue;
+FIFO Switch2NextLayer;
 
 // ==================== 图像操作 ===================
 FeatureMap* feature_map = NULL; // 当前特征图
@@ -77,6 +83,9 @@ void splitMap2Queue(FeatureMap* map, Kernel* kernel, FIFO& queue)
             }
         }
     }
+
+    current_map_side = map->side;
+    total_points = points.size() * layer_kernel; // 全部要处理的点的数量
 
     // 将每个点打包成能够发送的数据包
     // 存储在预备发送的队列中
@@ -126,6 +135,8 @@ void startNewLayer()
     layer_kernel = getKernelCount(current_layer);
     picker_bandwdith = Picker_FullBandwidth;
     picker_tagret = 0;
+    total_points = 0;
+    conved_points = 0;
     printf("\n========== 进入第%d层 ==========\n", current_layer);
 
     // 数据分割，一下子就分好了，没有延迟
@@ -169,7 +180,19 @@ void pickNextTarget()
  */
 void convCalc()
 {
+    // 不用计算，只需要延迟，不需要结果
+}
 
+/**
+ * 根据传递过来的结果，生成下一层结果的特征图
+ * 大小会缩小，new channel = this->kernel
+ * 由于中间没有计算的数据，干脆就全部使用0了
+ */
+void generalNextLayerMap()
+{
+    int channel = layer_kernel;
+    int side = current_map_side - KERNEL_SIDE + 1;
+    feature_map = new FeatureMap(side, channel);
 }
 
 
@@ -234,7 +257,11 @@ void dataOperator()
     }
 
     // 每个卷积核进行计算
+    // 不用计算了，结果不重要，全部0吧
 
+    // 如果SndFIFO结果已经满了，即新的特征图已经出来
+    // 合并特征图，转至Switch，最后传到下一层
+    // ...
 }
 
 /**
@@ -296,6 +323,7 @@ void dataTransfer()
             // 发送后各种数值的变化
             picker_bandwdith--;
             pickNextTarget();
+            has_transfered = true;
         }
     }
 
@@ -310,6 +338,7 @@ void dataTransfer()
         PickQueue.erase(PickQueue.begin() + i--);
         ConvQueue[packet->kernel_index].push_back(packet);
         packet->resetDelay(Dly_inConv);
+        has_transfered = true;
         DEB("ReqFIFO pick=> Conv %d\n", picker_tagret);
     }
 
@@ -360,19 +389,85 @@ void dataTransfer()
     { }*/
 
 
-    // 每个 ConvQueue 将结果发送给 SndFIFO，编号标记上店址
+    // 每个 ConvQueue 将结果发送给 SndFIFO
     for (int i = 0; i < layer_kernel; i++)
     {
         FIFO& queue = ConvQueue[i];
-        for (unsigned int j = 0; j < queue.size(); j++)
+        for (int j = 0; j < queue.size(); j++)
         {
             DataPacket* packet = queue.at(j);
             if (!packet->isDelayFinished())
                 continue;
 
             // Conv => SndFIFO
-
+            queue.erase(queue.begin() + j--);
+            Conv2SndFIFO.push_back(packet);
+            packet->resetDelay(Dly_Conv2SndFIFO);
+            has_transfered = true;
+            DEB("Conv %d => SndFIFO\n", i);
         }
+    }
+
+    // Conv => SndFIFO 的延迟
+    for (int i = 0; i < Conv2SndFIFO.size(); i++)
+    {
+        DataPacket* packet = Conv2SndFIFO.at(i);
+        if (!packet->isDelayFinished())
+            continue;
+
+        Conv2SndFIFO.erase(Conv2SndFIFO.begin() + i--);
+        SndQueue.push_back(packet);
+        packet->resetDelay(Dly_inSndFIFO);
+        has_transfered = true;
+    }
+
+    // SndFIFO 传送到 switch
+    for (int i = 0; i < SndQueue.size(); i++)
+    {
+        DataPacket* packet = SndQueue.at(i);
+        if (!packet->isDelayFinished())
+            continue;
+
+        SndQueue.erase(SndQueue.begin() + i--);
+        Snd2SwitchFIFO.push_back(packet);
+        packet->resetDelay(Dly_Snd2Switch);
+        has_transfered = true;
+    }
+
+    // SndFIFO => Switch 中途的总延迟
+    for (int i = 0; i < Snd2SwitchFIFO.size(); i++)
+    {
+        DataPacket* packet = Snd2SwitchFIFO.at(i);
+        if (!packet->isDelayFinished())
+            continue;
+
+        Snd2SwitchFIFO.erase(Snd2SwitchFIFO.begin() + i--);
+        SwitchQueue.push_back(packet);
+        packet->resetDelay(Dly_inSwitch);
+        has_transfered = true;
+    }
+
+    // Switch发送至下一层
+    for (int i = 0; i < SwitchQueue.size(); i++)
+    {
+        DataPacket* packet = SwitchQueue.at(i);
+        if (!packet->isDelayFinished())
+            continue;
+
+        SwitchQueue.erase(SwitchQueue.begin() + i--);
+        Switch2NextLayer.push_back(packet);
+        packet->resetDelay(Dly_Switch2NextPE);
+        has_transfered = true;
+    }
+
+    for (int i = 0; i < Switch2NextLayer.size(); i++)
+    {
+        DataPacket* packet = SwitchQueue.at(i);
+        if (!packet->isDelayFinished())
+            continue;
+
+        Switch2NextLayer.erase(Switch2NextLayer.begin() + i--);
+        has_transfered = true;
     }
 
 
@@ -396,12 +491,42 @@ void clockGoesBy()
         ReqQueue[i]->delayToNext();
     }
 
+    for (unsigned int i = 0; i < PickQueue.size(); i++)
+    {
+        PickQueue[i]->delayToNext();
+    }
+
     for (int i = 0; i < layer_kernel; i++)
     {
         for (unsigned int j = 0; j < ConvQueue[i].size(); j++)
         {
             ConvQueue[i].at(j)->delayToNext();
         }
+    }
+
+    for (unsigned int i = 0; i < Conv2SndFIFO.size(); i++)
+    {
+        Conv2SndFIFO[i]->delayToNext();
+    }
+
+    for (unsigned int i = 0; i < SndQueue.size(); i++)
+    {
+        SndQueue[i]->delayToNext();
+    }
+
+    for (unsigned int i = 0; i < Snd2SwitchFIFO.size(); i++)
+    {
+        Snd2SwitchFIFO[i]->delayToNext();
+    }
+
+    for (unsigned int i = 0; i < SwitchQueue.size(); i++)
+    {
+        SwitchQueue[i]->delayToNext();
+    }
+
+    for (unsigned int i = 0; i < Switch2NextLayer.size(); i++)
+    {
+        Switch2NextLayer[i]->delayToNext();
     }
 }
 
