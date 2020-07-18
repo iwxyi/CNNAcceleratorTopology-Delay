@@ -24,7 +24,7 @@
 #define ConvPoints_MaxSize 1600 // 要卷积的点的集合数量上限，要计算的话，至少要3*3*3*32
 #define ConvQueue_MaxSize 2    // 卷积结果存储的最大的大小
 
-#define DEB if(1) printf
+#define DEB if(0) printf
 typedef int ClockType;
 typedef std::vector<DataPacket*> FIFO;
 
@@ -195,6 +195,16 @@ void generalNextLayerMap()
     feature_map = new FeatureMap(side, channel);
 }
 
+/**
+ * 输出运行时的状况
+ */
+void printState()
+{
+    system("cls");
+    printf("当前在 第%d层    %lld / %lld\n", current_layer, conved_points, total_points);
+    printf("    推广图：%d * %d * %d\n", current_map_side, current_map_side, layer_channel);
+    printf("    卷积核：%d * %d * %d, %d个\n", KERNEL_SIDE, KERNEL_SIDE, layer_channel, layer_kernel);
+}
 
 // ==================== 流程控制 ===================
 // 函数前置声明
@@ -218,7 +228,7 @@ void runFlowControl()
 {
     while (true)
     {
-        Sleep(1); // 逐步显示流控
+//        Sleep(1); // 逐步显示流控
 
         inClock();
 
@@ -523,6 +533,8 @@ void clockGoesBy()
     {
         Switch2NextLayer[i]->delayToNext();
     }
+
+    printState();
 }
 
 /**
