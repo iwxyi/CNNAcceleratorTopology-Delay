@@ -13,6 +13,8 @@
 #include "convolution.h"
 
 int current_layer = 0;   // 当前正处在第几层
+int layer_channel = 3;   // 当前层图片深度，即channel数量
+int layer_kernel = 3;    // 当前层的kernel总数量
 int finished_kernel = 0; // 当前层结束的kernel数量
 std::vector<pthread_t*> conv_thread;   // 子线程对象
 std::vector<FeatureMap*> feature_maps; // 每张图
@@ -24,6 +26,8 @@ std::vector<FeatureMap*> feature_maps; // 每张图
 void initLayerResource()
 {
     current_layer = 0;   // 第0层
+    layer_channel = 3;
+    layer_kernel = 3;
     finished_kernel = 3; // 第0层的kernel数=第1层的channel=3
     feature_maps.push_back(new FeatureMap(0, MAP_SIDE_MAX, MAP_CHANNEL_DEFULT)); // 默认224*224*3的图
 }
@@ -106,14 +110,12 @@ void releasePrevLayerResource()
  */
 FeatureMap* getMergedMap()
 {
-    int kernel_count = getKernelCount(current_layer); // 上一层的kernel数量
     // 这里确保 finished_kernel == kernel_count == feature_maps.count(), 且 > 0
-    if (finished_kernel < kernel_count)
+    if (finished_kernel < layer_kernel) // 多线程未完成，无合并的图，返回NULL
         return NULL;
 
     // 合并FeatureMap
     FeatureMap* map = NULL;
-    int channel_count = kernel_count; // 这一层的channel数量 = 上一层的kernel数量 = 上一层生成map的数量
     if (current_layer <= 0) // 初次使用，不用这么多的操作
     {
         map = feature_maps.front();
@@ -130,9 +132,9 @@ FeatureMap* getMergedMap()
         });
 
         int side = prev_map.front()->side;
-        map = new FeatureMap(0, side, channel_count);
-        printf("合并特征图：%d * %d * %d\n", side, side, channel_count);
-        for (int i = 0; i < channel_count; i++)
+        map = new FeatureMap(0, side, layer_channel);
+        printf("合并特征图：%d * %d * %d\n", side, side, layer_channel);
+        for (int i = 0; i < layer_channel; i++)
         {
             // memcpy(map->map[i], prev_map.at(i)->map[0], sizeof(INT8)*side*side); // 不是连续内存，无法cpy
             INT8*** p_map = prev_map.at(i)->map;
@@ -170,17 +172,17 @@ bool judgeConvolutionThreads()
 
     // 进入下一层
     current_layer++;
+    layer_channel = getKernelCount(current_layer-1); // 当前层的channel=上一层的kernel
+    layer_kernel = getKernelCount(current_layer);
     printf("\n================ 进入第%d层 ================\n\n", current_layer);
-    int channel_count = getKernelCount(current_layer-1); // 当前层的channel=上一层的kernel
-    int kernel_count = getKernelCount(current_layer); // 当前层的kernel数量
-    printf("kernel count = %d\n", kernel_count);
+    printf("kernel count = %d\n", layer_kernel);
 
     // 开启多线程
     finished_kernel = 0; // 已完成的线程数量重置为0
-    for (int k = 0; k < kernel_count; k++)
+    for (int k = 0; k < layer_kernel; k++)
     {
         // 创建全空数据（图+核）。在线程结束的时候delete掉
-        ConvThreadArg* arg = new ConvThreadArg(current_layer, k+1, new FeatureMap(k+1, map), new Kernel(KERNEL_SIDE, channel_count));
+        ConvThreadArg* arg = new ConvThreadArg(current_layer, k+1, new FeatureMap(k+1, map), new Kernel(KERNEL_SIDE, layer_channel));
 
         // 传入多线程。该层子线程全部结束后统一释放
         pthread_t* thread = new pthread_t;

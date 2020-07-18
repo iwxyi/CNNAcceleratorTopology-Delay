@@ -133,7 +133,7 @@ struct ConvThreadArg {
         : layer(layer), k_indx(k), map(img), kernel(kernel)
     {}
     int layer = 0;          // 当前是第几层
-    int k_indx = 0;         // 核的索引，最终与其他核（按顺序？）合并
+    int k_indx = 0;         // 核的索引，最终与其他核（按顺序）
     FeatureMap *map = NULL; // 图的对象指针
     Kernel *kernel;         // 卷积核的边长
 };

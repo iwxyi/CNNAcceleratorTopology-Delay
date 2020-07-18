@@ -4,7 +4,7 @@
 
 int main()
 {
-#if 0
+#if 1
     initFlowControl();
 
     runFlowControl();
