@@ -16,13 +16,6 @@
 #include "layerthread.h"
 #include "delaydefine.h"
 
-#define PacketPointCount 2      // 每个req带有几个点的数量
-#define ReqQueue_MaxSize 24     // ReqQueue数据量上限
-#define DatLatch_MaxSize 24     // 和上面要一样大小
-#define Picker_FullBandwidth 5  // 1个clock进行pick的数量，即bandwidth
-#define ConvPoints_MaxSize 1600 // 要卷积的点的集合数量上限，要计算的话，至少要3*3*3*32
-#define ConvQueue_MaxSize 2     // 卷积核存储的最大的大小
-
 #define DEB if (0) printf
 typedef int ClockType;
 typedef std::vector<DataPacket*> FIFO;
@@ -30,6 +23,7 @@ typedef std::vector<DataPacket*> FIFO;
 
 // 从一开始到现在经过的clock
 ClockType global_clock = 0;
+int layer_start_clock = 0;
 // 某一个clock是否有数据流传输，若有则继续重新判断整个传输流程
 // 使用此flag解决单线程机制无法模拟多线程的多数据同步传输问题
 bool has_transfered = false;
@@ -40,7 +34,7 @@ long long total_points = 0; // 总共参与卷积的点
 long long conved_points = 0; // 已经卷积并且结束的点。如果两者相等，则表示当前层已经结束了
 
 // ==================== 各种队列 ===================
-FIFO StartQueue; // 特征图的每一点生成后的总队列
+FIFO StartQueue; // 特征图的每一点生成后并传输到ReqQueue的队列
 FIFO ReqQueue;   // 特征图的每一点req的队列；tag和data相同
 //FIFO DatLatch;   // 特征图的每一点data的队列；tag和req相同
 FIFO PickQueue; // pick后进行delay的队列
@@ -114,7 +108,7 @@ void splitMap2Queue(FeatureMap* map, Kernel* kernel, FIFO& queue)
                 + (packet->CubeID << 8)
                 + (packet->SubID);
         packet->points = vec;
-        packet->resetDelay(Dly_inReqFIFO);
+        packet->resetDelay(Dly_Map2RegFIFO);
         queue.push_back(packet);
     }
 }
@@ -128,6 +122,7 @@ void startNewLayer()
     current_layer++;
     layer_channel = getKernelCount(current_layer-1);
     layer_kernel = getKernelCount(current_layer);
+    layer_start_clock = global_clock;
     picker_bandwdith = Picker_FullBandwidth;
     picker_tagret = 0;
     total_points = 0;
@@ -196,7 +191,7 @@ void generalNextLayerMap()
 void printState()
 {
 #ifdef Q_OS_WIN
-    // 实测跑第一层，不加清屏是90s，加了约8000s
+    // 实测跑第一层（非当前程序），不加清屏是90s，加了约8000s
     // system("cls"); // 非常非常损耗性能，会降低近百倍速度
 #else
     // system("clear"); // 非常非常损耗性能，会降低近百倍速度
@@ -358,10 +353,9 @@ void dataTransfer()
         for (int i = 0; i < ReqQueue.size(); i++)
         {
             DataPacket* packet = ReqQueue.at(i);
-            // packet 延迟没有结束；或者根本就不是这个kernel的
-            // （这样的picker的性能似乎不高）
+            // packet 延迟没有结束
             if (!packet->isDelayFinished())
-                continue;
+                break;
 
             // packet能发送，kernel能接收
             // 开始发送
@@ -389,7 +383,7 @@ void dataTransfer()
     {
         DataPacket* packet = PickQueue.at(i);
         if (!packet->isDelayFinished())
-            continue;
+            break;
 
         // pick延迟结束，进入conv
         PickQueue.erase(PickQueue.begin() + i--);
@@ -398,46 +392,6 @@ void dataTransfer()
         has_transfered = true;
         DEB("ReqFIFO pick=> Conv %d\n", picker_tagret);
     }
-
-
-    /*// 需求变更：ConvPoints用不到了，因为 Conv 这些不再是存储点，只是点的delay
-    int start_picker_target = picker_tagret; // 记录当前的picker的目标，避免全部一遍后的死循环
-    while (picker_bandwdith > 0)
-    {
-        // 如果数据点的数量已经达到了上限，则跳过这个kernel
-        if (ConvPoints[picker_tagret].size() >= ConvPoints_MaxSize)
-        {
-            pickNextTarget(); // pick到下一根
-            if (picker_tagret == start_picker_target) // 全部轮询了一遍都不行，取消遍历
-                break;
-            continue;
-        }
-
-        for (int i = 0; i < ReqQueue.size(); i++)
-        {
-            DataPacket* packet = ReqQueue.at(i);
-            // packet 延迟没有结束；或者根本就不是这个kernel的
-            // （这样的picker的性能似乎不高）
-            if (!packet->isDelayFinished() || packet->kernel_index != picker_tagret)
-                continue;
-
-            // packet能发送，kernel能接收
-            // 开始发送
-            PointVec vec = packet->points;
-            for (unsigned int p = 0; p < vec.size(); p++)
-            {
-                ConvPoints[picker_tagret].push_back(vec.at(p));
-            }
-            DEB("ReqFIFO => Conv %d\n", picker_tagret);
-
-            // 删除packet本身（已经不需要这个packet了）
-            ReqQueue.erase(ReqQueue.begin() + i--);
-
-            // 发送后各种数值的变化
-            picker_bandwdith--;
-            pickNextTarget();
-        }
-    }*/
 
 
     // DatLatch Pick给 ConvQueue。要先确定相同Tag的Req先发送才能发
@@ -454,7 +408,7 @@ void dataTransfer()
         {
             DataPacket* packet = queue.at(j);
             if (!packet->isDelayFinished())
-                continue;
+                break;
 
             // Conv => SndFIFO
             queue.erase(queue.begin() + j--);
@@ -470,7 +424,7 @@ void dataTransfer()
     {
         DataPacket* packet = Conv2SndFIFO.at(i);
         if (!packet->isDelayFinished())
-            continue;
+            break;
 
         Conv2SndFIFO.erase(Conv2SndFIFO.begin() + i--);
         SndQueue.push_back(packet);
@@ -512,7 +466,7 @@ void dataTransfer()
     {
         DataPacket* packet = Snd2SwitchFIFO.at(i);
         if (!packet->isDelayFinished())
-            continue;
+            break;
 
         Snd2SwitchFIFO.erase(Snd2SwitchFIFO.begin() + i--);
         SwitchQueue.push_back(packet);
@@ -526,7 +480,7 @@ void dataTransfer()
     {
         DataPacket* packet = SwitchQueue.at(i);
         if (!packet->isDelayFinished())
-            continue;
+            break;
 
         SwitchQueue.erase(SwitchQueue.begin() + i--);
         Switch2NextLayer.push_back(packet);
@@ -574,47 +528,79 @@ void dataTransfer()
  */
 void clockGoesBy()
 {
-    for (unsigned int i = 0; i < ReqQueue.size(); i++)
+    if (Dly_Map2RegFIFO && layer_start_clock + Dly_Map2RegFIFO >= global_clock)
     {
-        ReqQueue[i]->delayToNext();
-    }
-
-    for (unsigned int i = 0; i < PickQueue.size(); i++)
-    {
-        PickQueue[i]->delayToNext();
-    }
-
-    for (int i = 0; i < layer_kernel; i++)
-    {
-        for (unsigned int j = 0; j < ConvQueue[i].size(); j++)
+        for (unsigned int i = 0; i < StartQueue.size(); i++)
         {
-            ConvQueue[i].at(j)->delayToNext();
+            StartQueue[i]->delayToNext();
         }
     }
 
-    for (unsigned int i = 0; i < Conv2SndFIFO.size(); i++)
+    if (Dly_inReqFIFO)
     {
-        Conv2SndFIFO[i]->delayToNext();
+        for (unsigned int i = 0; i < ReqQueue.size(); i++)
+        {
+            ReqQueue[i]->delayToNext();
+        }
     }
 
-    for (unsigned int i = 0; i < SndQueue.size(); i++)
+    if (Dly_onPick)
     {
-        SndQueue[i]->delayToNext();
+        for (unsigned int i = 0; i < PickQueue.size(); i++)
+        {
+            PickQueue[i]->delayToNext();
+        }
     }
 
-    for (unsigned int i = 0; i < Snd2SwitchFIFO.size(); i++)
+    if (Dly_inConv)
     {
-        Snd2SwitchFIFO[i]->delayToNext();
+        for (int i = 0; i < layer_kernel; i++)
+        {
+            for (unsigned int j = 0; j < ConvQueue[i].size(); j++)
+            {
+                ConvQueue[i].at(j)->delayToNext();
+            }
+        }
     }
 
-    for (unsigned int i = 0; i < SwitchQueue.size(); i++)
+    if (Dly_Conv2SndFIFO)
     {
-        SwitchQueue[i]->delayToNext();
+        for (unsigned int i = 0; i < Conv2SndFIFO.size(); i++)
+        {
+            Conv2SndFIFO[i]->delayToNext();
+        }
     }
 
-    for (unsigned int i = 0; i < Switch2NextLayer.size(); i++)
+    if (Dly_inSndFIFO)
     {
-        Switch2NextLayer[i]->delayToNext();
+        for (unsigned int i = 0; i < SndQueue.size(); i++)
+        {
+            SndQueue[i]->delayToNext();
+        }
+    }
+
+    if (Dly_Snd2Switch)
+    {
+        for (unsigned int i = 0; i < Snd2SwitchFIFO.size(); i++)
+        {
+            Snd2SwitchFIFO[i]->delayToNext();
+        }
+    }
+
+    if (Dly_inSwitch)
+    {
+        for (unsigned int i = 0; i < SwitchQueue.size(); i++)
+        {
+            SwitchQueue[i]->delayToNext();
+        }
+    }
+
+    if (Dly_Switch2NextPE)
+    {
+        for (unsigned int i = 0; i < Switch2NextLayer.size(); i++)
+        {
+            Switch2NextLayer[i]->delayToNext();
+        }
     }
 }
 

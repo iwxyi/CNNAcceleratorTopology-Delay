@@ -1,6 +1,14 @@
 #ifndef DELAYDEFINE_H
 #define DELAYDEFINE_H
 
+// 各种模块
+#define PacketPointCount 2      // 每个req数据包带有几个点的数量
+#define ReqQueue_MaxSize 24     // ReqQueue数据量上限
+#define DatLatch_MaxSize 24     // 和Data数量上限（无效，没有空间也跟着req强行传进去）
+#define Picker_FullBandwidth 5  // 1个clock进行pick的数据数量
+#define ConvQueue_MaxSize 2     // 卷积核存储的数据包最大的大小
+
+// 各种delay
 #define Dly_Map2RegFIFO 1   // 每个数据到ReqFIFO里面的delay
 #define Dly_inReqFIFO 0     // ReqFIFO中的delay
 #define Dly_onPick 1        // ReqQueue里每个数据Pick去卷积的delay
