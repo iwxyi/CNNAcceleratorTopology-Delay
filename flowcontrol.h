@@ -51,6 +51,7 @@ FIFO Switch2NextLayer;
 // ==================== 图像操作 ===================
 FeatureMap* feature_map = NULL; // 当前特征图
 std::vector<Kernel*> kernels;   // 卷积核数组
+HANDLE HOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 
 
 // ==================== 特征图操作 ===================
@@ -195,12 +196,13 @@ void printState()
 #ifdef Q_OS_WIN
     // 实测跑第一层（非当前程序），不加清屏是90s，加了约8000s
     // system("cls"); // 非常非常损耗性能，会降低近百倍速度
+    SetConsoleCursorPosition(HOutput, COORD{0,0}); // 这句话改变光标输出位置，不是清屏
 #else
     // system("clear"); // 非常非常损耗性能，会降低近百倍速度
     printf("\033c"); // 这句清屏命令不吃性能
 #endif
-    printf("\ncurrent clock: %d\n", global_clock);
-    printf("current layer: %d    %lld / %lld (%.4f%%)\n", current_layer, conved_points, total_points,
+    printf("current clock: %d\n", global_clock);
+    printf("current layer: %d    %lld / %lld (%.4f%%)    \n", current_layer, conved_points, total_points,
            total_points == 0 ? 100 : conved_points*100.0/total_points);
     printf("    feature map: %d * %d * %d\n", current_map_side, current_map_side, layer_channel);
     printf("    conv kernel: %d * %d * %d, count = %d\n", KERNEL_SIDE, KERNEL_SIDE, layer_channel, layer_kernel);
@@ -277,8 +279,6 @@ void runFlowControl()
 {
     while (true)
     {
-//        Sleep(1); // 逐步显示流控
-
         inClock();
 
         // 如果超过了最后一层，则退出
@@ -308,7 +308,7 @@ void inClock()
 
     dataTransfer();
 
-    clockGoesBy();
+//    clockGoesBy();
 
     printState();
 }
@@ -346,7 +346,7 @@ void dataTransfer()
     while (picker_bandwdith > 0 && ReqQueue.size())
     {
         // 如果卷积核数据数量已经达到了上限，则跳过这个kernel
-        if (ConvQueue[picker_tagret].size() > ConvQueue_MaxSize)
+        if (ConvQueue[picker_tagret].size() - Dly_onPick + Dly_inConv > ConvQueue_MaxSize)
         {
             pickNextTarget(); // pick到下一根
             continue;

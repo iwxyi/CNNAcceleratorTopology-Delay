@@ -117,6 +117,7 @@ struct DataPacket
 
     bool isDelayFinished()
     {
+        return true;
         return delay_step >= delay_max;
     }
 };
