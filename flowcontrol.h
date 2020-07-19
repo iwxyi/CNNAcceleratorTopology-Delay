@@ -1,77 +1,76 @@
 /**
-  * ¸÷ÖÖÁ÷³Ì¿ØÖÆµÄÀà
+  * å„ç§æµç¨‹æ§åˆ¶çš„ç±»
   */
 
 /**
   * TODO:
-  * - Ğ¡·½¿éÖĞºÜ¶àµãÖØ¸´Îª3´Î£¿
-  * - Ğ¡·½ÃæÃ¿¸öµã¶¼Òª·Ö³É8(kernel)·İ£¬´´½¨Ê±·Ö»¹ÊÇpickÊ±·Ö£¿
+  * - å°æ–¹å—ä¸­å¾ˆå¤šç‚¹é‡å¤ä¸º3æ¬¡ï¼Ÿ
+  * - å°æ–¹é¢æ¯ä¸ªç‚¹éƒ½è¦åˆ†æˆ8(kernel)ä»½ï¼Œåˆ›å»ºæ—¶åˆ†è¿˜æ˜¯pickæ—¶åˆ†ï¼Ÿ
   */
 
 #ifndef FLOWCONTR_H
 #define FLOWCONTR_H
 
 #include <list>
-#include <windows.h>
 #include "datapacket.h"
 #include "layerthread.h"
 #include "delaydefine.h"
 
-#define PacketPointCount 2      // Ã¿¸öreq´øÓĞ¼¸¸öµãµÄÊıÁ¿
-#define ReqQueue_MaxSize 24     // ReqQueueÊı¾İÁ¿ÉÏÏŞ
-#define DatLatch_MaxSize 24     // ºÍÉÏÃæÒªÒ»Ñù´óĞ¡
-#define Picker_FullBandwidth 5  // 1¸öclock½øĞĞpickµÄÊıÁ¿£¬¼´bandwidth
-#define ConvPoints_MaxSize 1600 // Òª¾í»ıµÄµãµÄ¼¯ºÏÊıÁ¿ÉÏÏŞ£¬Òª¼ÆËãµÄ»°£¬ÖÁÉÙÒª3*3*3*32
-#define ConvQueue_MaxSize 2    // ¾í»ı½á¹û´æ´¢µÄ×î´óµÄ´óĞ¡
+#define PacketPointCount 2      // æ¯ä¸ªreqå¸¦æœ‰å‡ ä¸ªç‚¹çš„æ•°é‡
+#define ReqQueue_MaxSize 24     // ReqQueueæ•°æ®é‡ä¸Šé™
+#define DatLatch_MaxSize 24     // å’Œä¸Šé¢è¦ä¸€æ ·å¤§å°
+#define Picker_FullBandwidth 5  // 1ä¸ªclockè¿›è¡Œpickçš„æ•°é‡ï¼Œå³bandwidth
+#define ConvPoints_MaxSize 1600 // è¦å·ç§¯çš„ç‚¹çš„é›†åˆæ•°é‡ä¸Šé™ï¼Œè¦è®¡ç®—çš„è¯ï¼Œè‡³å°‘è¦3*3*3*32
+#define ConvQueue_MaxSize 2     // å·ç§¯æ ¸å­˜å‚¨çš„æœ€å¤§çš„å¤§å°
 
-#define DEB if(0) printf
+#define DEB if(1) printf
 typedef int ClockType;
 typedef std::vector<DataPacket*> FIFO;
 
 
-// ´ÓÒ»¿ªÊ¼µ½ÏÖÔÚ¾­¹ıµÄclock
+// ä»ä¸€å¼€å§‹åˆ°ç°åœ¨ç»è¿‡çš„clock
 ClockType global_clock = 0;
-// Ä³Ò»¸öclockÊÇ·ñÓĞÊı¾İÁ÷´«Êä£¬ÈôÓĞÔò¼ÌĞøÖØĞÂÅĞ¶ÏÕû¸ö´«ÊäÁ÷³Ì
-// Ê¹ÓÃ´Ëflag½â¾öµ¥Ïß³Ì»úÖÆÎŞ·¨Ä£Äâ¶àÏß³ÌµÄ¶àÊı¾İÍ¬²½´«ÊäÎÊÌâ
+// æŸä¸€ä¸ªclockæ˜¯å¦æœ‰æ•°æ®æµä¼ è¾“ï¼Œè‹¥æœ‰åˆ™ç»§ç»­é‡æ–°åˆ¤æ–­æ•´ä¸ªä¼ è¾“æµç¨‹
+// ä½¿ç”¨æ­¤flagè§£å†³å•çº¿ç¨‹æœºåˆ¶æ— æ³•æ¨¡æ‹Ÿå¤šçº¿ç¨‹çš„å¤šæ•°æ®åŒæ­¥ä¼ è¾“é—®é¢˜
 bool has_transfered = false;
-int picker_bandwdith = Picker_FullBandwidth; // pickµÄ×î´óbandwidth
-int picker_tagret = 0; // pickerÏÂÒ»´ÎpickµÄÄ¿±ê£¬0~layer_kernel-1¡£Èç¹û²»ĞĞ£¬ÔòÌø¹ı
-int current_map_side = 0; // µ±Ç°Í¼ÏñµÄ´óĞ¡
-long long total_points = 0; // ×Ü¹²²ÎÓë¾í»ıµÄµã
-long long conved_points = 0; // ÒÑ¾­¾í»ı²¢ÇÒ½áÊøµÄµã¡£Èç¹ûÁ½ÕßÏàµÈ£¬Ôò±íÊ¾µ±Ç°²ãÒÑ¾­½áÊøÁË
+int picker_bandwdith = Picker_FullBandwidth; // pickçš„æœ€å¤§bandwidth
+int picker_tagret = 0; // pickerä¸‹ä¸€æ¬¡pickçš„ç›®æ ‡ï¼Œ0~layer_kernel-1ã€‚å¦‚æœä¸è¡Œï¼Œåˆ™è·³è¿‡
+int current_map_side = 0; // å½“å‰å›¾åƒçš„å¤§å°
+long long total_points = 0; // æ€»å…±å‚ä¸å·ç§¯çš„ç‚¹
+long long conved_points = 0; // å·²ç»å·ç§¯å¹¶ä¸”ç»“æŸçš„ç‚¹ã€‚å¦‚æœä¸¤è€…ç›¸ç­‰ï¼Œåˆ™è¡¨ç¤ºå½“å‰å±‚å·²ç»ç»“æŸäº†
 
-// ==================== ¸÷ÖÖ¶ÓÁĞ ===================
-FIFO StartQueue; // ÌØÕ÷Í¼µÄÃ¿Ò»µãÉú³ÉºóµÄ×Ü¶ÓÁĞ
-FIFO ReqQueue;   // ÌØÕ÷Í¼µÄÃ¿Ò»µãreqµÄ¶ÓÁĞ£»tagºÍdataÏàÍ¬
-//FIFO DatLatch;   // ÌØÕ÷Í¼µÄÃ¿Ò»µãdataµÄ¶ÓÁĞ£»tagºÍreqÏàÍ¬
-FIFO PickQueue; // pickºó½øĞĞdelayµÄ¶ÓÁĞ
-//PointVec ConvPoints[KERNEL_MAX_COUNT]; // ¾í»ıÊı¾İµÈ´ı¶ÓÁĞ
-FIFO ConvQueue[KERNEL_MAX_COUNT]; // Ã¿¸ö¾í»ı½á¹û¶ÓÁĞ
+// ==================== å„ç§é˜Ÿåˆ— ===================
+FIFO StartQueue; // ç‰¹å¾å›¾çš„æ¯ä¸€ç‚¹ç”Ÿæˆåçš„æ€»é˜Ÿåˆ—
+FIFO ReqQueue;   // ç‰¹å¾å›¾çš„æ¯ä¸€ç‚¹reqçš„é˜Ÿåˆ—ï¼›tagå’Œdataç›¸åŒ
+//FIFO DatLatch;   // ç‰¹å¾å›¾çš„æ¯ä¸€ç‚¹dataçš„é˜Ÿåˆ—ï¼›tagå’Œreqç›¸åŒ
+FIFO PickQueue; // pickåè¿›è¡Œdelayçš„é˜Ÿåˆ—
+//PointVec ConvPoints[KERNEL_MAX_COUNT]; // å·ç§¯æ•°æ®ç­‰å¾…é˜Ÿåˆ—
+FIFO ConvQueue[KERNEL_MAX_COUNT]; // æ¯ä¸ªå·ç§¯ç»“æœé˜Ÿåˆ—
 FIFO Conv2SndFIFO; // Conv => SndFIFO
-FIFO SndQueue;   // ºÏ²¢ºóµÄÊı¾İ¶ÓÁĞ£¬·¢ËÍµ½ÏÂÒ»²ã
+FIFO SndQueue;   // åˆå¹¶åçš„æ•°æ®é˜Ÿåˆ—ï¼Œå‘é€åˆ°ä¸‹ä¸€å±‚
 FIFO Snd2SwitchFIFO;
 FIFO SwitchQueue;
 FIFO Switch2NextLayer;
 
-// ==================== Í¼Ïñ²Ù×÷ ===================
-FeatureMap* feature_map = NULL; // µ±Ç°ÌØÕ÷Í¼
-std::vector<Kernel*> kernels;   // ¾í»ıºËÊı×é
+// ==================== å›¾åƒæ“ä½œ ===================
+FeatureMap* feature_map = NULL; // å½“å‰ç‰¹å¾å›¾
+std::vector<Kernel*> kernels;   // å·ç§¯æ ¸æ•°ç»„
 
 
-// ==================== ÌØÕ÷Í¼²Ù×÷ ===================
+// ==================== ç‰¹å¾å›¾æ“ä½œ ===================
 /**
- * ½«ÌØÕ÷Í¼·Ö¸î³É·Ç³£·Ç³£Ğ¡µÄÁ£×ÓÊı¾İ°ü
- * ÆäÖĞÃ¿¸öĞ¡µãÊı¾İ°ü¶¼ÖØ¸´kernelÊıÁ¿´Î
- * °´Ë³Ğò£¨ËùÒÔÂúÁËÊıÁ¿¾ÍÄÜ·¢ËÍÁË£©·ÅÈëµ½¶ÓÁĞÀïÃæ£¬×¼±¸·¢ËÍ
- * @param map    Òª»¬¶¯µÄÌØÕ÷Í¼
- * @param kernel ÕâÀï²»ÊÇÒªÏà¼Ó£¬Ö»ÊÇ·Ö¸î
- * @param queue  ´æ´¢½á¹ûÊı¾İ°üµÄ¶ÓÁĞ
+ * å°†ç‰¹å¾å›¾åˆ†å‰²æˆéå¸¸éå¸¸å°çš„ç²’å­æ•°æ®åŒ…
+ * å…¶ä¸­æ¯ä¸ªå°ç‚¹æ•°æ®åŒ…éƒ½é‡å¤kernelæ•°é‡æ¬¡
+ * æŒ‰é¡ºåºï¼ˆæ‰€ä»¥æ»¡äº†æ•°é‡å°±èƒ½å‘é€äº†ï¼‰æ”¾å…¥åˆ°é˜Ÿåˆ—é‡Œé¢ï¼Œå‡†å¤‡å‘é€
+ * @param map    è¦æ»‘åŠ¨çš„ç‰¹å¾å›¾
+ * @param kernel è¿™é‡Œä¸æ˜¯è¦ç›¸åŠ ï¼Œåªæ˜¯åˆ†å‰²
+ * @param queue  å­˜å‚¨ç»“æœæ•°æ®åŒ…çš„é˜Ÿåˆ—
  */
 void splitMap2Queue(FeatureMap* map, Kernel* kernel, FIFO& queue)
 {
-    // ½«ÌØÕ÷Í¼·Ö¸î³ÉĞ¡µã¶ÓÁĞ
+    // å°†ç‰¹å¾å›¾åˆ†å‰²æˆå°ç‚¹é˜Ÿåˆ—
     INT8*** m = map->map;
-    int side = map->side - kernel->side + 1;
+    int side = map->side/* - kernel->side + 1*/; // ä¸æ˜¯åœ¨è¿™é‡Œå·ç§¯çš„ï¼Œä½¿ç”¨åŸå§‹å¤§å°
     PointVec points;
     for (int y = 0; y < side; y++)
     {
@@ -85,38 +84,38 @@ void splitMap2Queue(FeatureMap* map, Kernel* kernel, FIFO& queue)
     }
 
     current_map_side = map->side;
-    total_points = points.size() * layer_kernel; // È«²¿Òª´¦ÀíµÄµãµÄÊıÁ¿
+    total_points = points.size() * layer_kernel; // å…¨éƒ¨è¦å¤„ç†çš„ç‚¹çš„æ•°é‡
 
-    // ½«Ã¿¸öµã´ò°ü³ÉÄÜ¹»·¢ËÍµÄÊı¾İ°ü
-    // ´æ´¢ÔÚÔ¤±¸·¢ËÍµÄ¶ÓÁĞÖĞ
+    // å°†æ¯ä¸ªç‚¹æ‰“åŒ…æˆèƒ½å¤Ÿå‘é€çš„æ•°æ®åŒ…
+    // å­˜å‚¨åœ¨é¢„å¤‡å‘é€çš„é˜Ÿåˆ—ä¸­
     unsigned int size = points.size();
     for (unsigned int i = 0; i < size; )
     {
-        // Õâ¸öÊı¾İ°üµÄÊ×¸öµãµÄ×ø±ê£¬ÓÃÀ´±àºÅ
+        // è¿™ä¸ªæ•°æ®åŒ…çš„é¦–ä¸ªç‚¹çš„åæ ‡ï¼Œç”¨æ¥ç¼–å·
         int y = points[i].y;
         int x = points[i].x;
         int z = points[i].z;
 
-        // Ã¿¸öÊı¾İ°ü°üº¬¼¸¸öµã
+        // æ¯ä¸ªæ•°æ®åŒ…åŒ…å«å‡ ä¸ªç‚¹
         PointVec vec;
         for (int j = 0; j < PacketPointCount && i < size; j++)
         {
             vec.push_back(points[i++]);
         }
 
-        // ´´½¨µ±Ç°²ãkernelÊıÁ¿¸ö³ıÁËKernelË÷ÒıÍâ¶¼Ò»Ä£Ò»ÑùµÄÊı¾İ°ü
-        // ÒòÎªÍ¬Ò»¸öµã»á±»Ğí¶à¸ö²»Í¬µÄ¾í»ıºË¶ÁÈ¡
+        // åˆ›å»ºå½“å‰å±‚kernelæ•°é‡ä¸ªé™¤äº†Kernelç´¢å¼•å¤–éƒ½ä¸€æ¨¡ä¸€æ ·çš„æ•°æ®åŒ…
+        // å› ä¸ºåŒä¸€ä¸ªç‚¹ä¼šè¢«è®¸å¤šä¸ªä¸åŒçš„å·ç§¯æ ¸è¯»å–
         for (int knl = 0; knl < layer_kernel; knl++)
         {
             DataPacket* packet = new DataPacket(m[y][x][z]);
             packet->ImgID = (INT8)z;
             packet->CubeID = (INT8)y;
             packet->SubID = (INT8)x;
-            // TagÔİÊ±ÎªÈı¸öIDÆ´½Ó£¬È·±£Ã¿¸öpacketµÄTag¶¼²»ÏàÍ¬
+            // Tagæš‚æ—¶ä¸ºä¸‰ä¸ªIDæ‹¼æ¥ï¼Œç¡®ä¿æ¯ä¸ªpacketçš„Tagéƒ½ä¸ç›¸åŒ
             packet->Tag = (packet->ImgID << 16)
                     + (packet->CubeID << 8)
                     + (packet->SubID);
-            packet->kernel_index = knl; // Ö¸Ïò½«Òª±»·¢ËÍµÄkernelË÷Òı£¬´Ó0¿ªÊ¼
+            packet->kernel_index = knl; // æŒ‡å‘å°†è¦è¢«å‘é€çš„kernelç´¢å¼•ï¼Œä»0å¼€å§‹
             packet->points = vec;
             packet->resetDelay(Dly_inReqFIFO);
             queue.push_back(packet);
@@ -125,11 +124,11 @@ void splitMap2Queue(FeatureMap* map, Kernel* kernel, FIFO& queue)
 }
 
 /**
- * ¿ªÆôĞÂµÄÒ»²ã
+ * å¼€å¯æ–°çš„ä¸€å±‚
  */
 void startNewLayer()
 {
-    // ÕâÀïÊÇÒ»²ãµÄ¿ªÊ¼
+    // è¿™é‡Œæ˜¯ä¸€å±‚çš„å¼€å§‹
     current_layer++;
     layer_channel = getKernelCount(current_layer-1);
     layer_kernel = getKernelCount(current_layer);
@@ -137,9 +136,9 @@ void startNewLayer()
     picker_tagret = 0;
     total_points = 0;
     conved_points = 0;
-    printf("\n========== ½øÈëµÚ%d²ã ==========\n", current_layer);
+    printf("\n========== enter layer %d ==========\n", current_layer);
 
-    // Êı¾İ·Ö¸î£¬Ò»ÏÂ×Ó¾Í·ÖºÃÁË£¬Ã»ÓĞÑÓ³Ù
+    // æ•°æ®åˆ†å‰²ï¼Œä¸€ä¸‹å­å°±åˆ†å¥½äº†ï¼Œæ²¡æœ‰å»¶è¿Ÿ
     Kernel* kernel = new Kernel(KERNEL_SIDE, getKernelCount(current_layer-1));
     splitMap2Queue(feature_map, kernel, StartQueue);
     delete kernel;
@@ -148,10 +147,10 @@ void startNewLayer()
 }
 
 /**
- * ÔÚÒ»¸öqueueÀïÃæ²éÕÒÊÇ·ñÓĞÕâ¸ötag
- * ReqQueueÀï²éÕÒData
- * DatLatchÀï²éÕÒRequest
- * £¨ÏÖÔÚÒÑ¾­Ã»ÓĞDatLatchÁË£¬ÓÃ²»µ½£©
+ * åœ¨ä¸€ä¸ªqueueé‡Œé¢æŸ¥æ‰¾æ˜¯å¦æœ‰è¿™ä¸ªtag
+ * ReqQueueé‡ŒæŸ¥æ‰¾Data
+ * DatLatché‡ŒæŸ¥æ‰¾Request
+ * ï¼ˆç°åœ¨å·²ç»æ²¡æœ‰DatLatchäº†ï¼Œç”¨ä¸åˆ°ï¼‰
  */
 bool findTagInQueue(FIFO queue, TagType tag)
 {
@@ -164,7 +163,7 @@ bool findTagInQueue(FIFO queue, TagType tag)
 }
 
 /**
- * ÇĞ»»ÖÁÏÂÒ»¸öpickµÄÄ¿±ê
+ * åˆ‡æ¢è‡³ä¸‹ä¸€ä¸ªpickçš„ç›®æ ‡
  */
 void pickNextTarget()
 {
@@ -174,19 +173,19 @@ void pickNextTarget()
 }
 
 /**
- * ÅĞ¶ÏÃ¿¸ö¾í»ıºËµÄÊı¾İÁ¿ÊÇ·ñ´ïµ½ÄÜ¹»¼ÆËãµÄ³Ì¶È
- * Èç¹û¿ÉÒÔ¼ÆËã£¬¼´ size() >= Æ«ÒÆ+KERNEL_SIDE * KERNEL_SIDE * layer_channel
- * Ôò½«ÕâĞ©ÊıÁ¿µÄÊı¾İ½øĞĞÀÛ¼Ó£¬²¢½«½á¹ûÉú³ÉĞÂµÄDataPacket´«µİÖÁÏÂÒ»¸ö¶ÓÁĞ
+ * åˆ¤æ–­æ¯ä¸ªå·ç§¯æ ¸çš„æ•°æ®é‡æ˜¯å¦è¾¾åˆ°èƒ½å¤Ÿè®¡ç®—çš„ç¨‹åº¦
+ * å¦‚æœå¯ä»¥è®¡ç®—ï¼Œå³ size() >= åç§»+KERNEL_SIDE * KERNEL_SIDE * layer_channel
+ * åˆ™å°†è¿™äº›æ•°é‡çš„æ•°æ®è¿›è¡Œç´¯åŠ ï¼Œå¹¶å°†ç»“æœç”Ÿæˆæ–°çš„DataPacketä¼ é€’è‡³ä¸‹ä¸€ä¸ªé˜Ÿåˆ—
  */
 void convCalc()
 {
-    // ²»ÓÃ¼ÆËã£¬Ö»ĞèÒªÑÓ³Ù£¬²»ĞèÒª½á¹û
+    // ä¸ç”¨è®¡ç®—ï¼Œåªéœ€è¦å»¶è¿Ÿï¼Œä¸éœ€è¦ç»“æœ
 }
 
 /**
- * ¸ù¾İ´«µİ¹ıÀ´µÄ½á¹û£¬Éú³ÉÏÂÒ»²ã½á¹ûµÄÌØÕ÷Í¼
- * ´óĞ¡»áËõĞ¡£¬new channel = this->kernel
- * ÓÉÓÚÖĞ¼äÃ»ÓĞ¼ÆËãµÄÊı¾İ£¬¸É´à¾ÍÈ«²¿Ê¹ÓÃ0ÁË
+ * æ ¹æ®ä¼ é€’è¿‡æ¥çš„ç»“æœï¼Œç”Ÿæˆä¸‹ä¸€å±‚ç»“æœçš„ç‰¹å¾å›¾
+ * å¤§å°ä¼šç¼©å°ï¼Œnew channel = this->kernel
+ * ç”±äºä¸­é—´æ²¡æœ‰è®¡ç®—çš„æ•°æ®ï¼Œå¹²è„†å°±å…¨éƒ¨ä½¿ç”¨0äº†
  */
 void generalNextLayerMap()
 {
@@ -196,57 +195,82 @@ void generalNextLayerMap()
 }
 
 /**
- * Êä³öÔËĞĞÊ±µÄ×´¿ö
+ * è¾“å‡ºè¿è¡Œæ—¶çš„çŠ¶å†µ
  */
 void printState()
 {
+#ifdef Q_OS_WIN
     system("cls");
-    printf("µ±Ç°ÔÚ µÚ%d²ã    %lld / %lld\n", current_layer, conved_points, total_points);
-    printf("    ÍÆ¹ãÍ¼£º%d * %d * %d\n", current_map_side, current_map_side, layer_channel);
-    printf("    ¾í»ıºË£º%d * %d * %d, %d¸ö\n", KERNEL_SIDE, KERNEL_SIDE, layer_channel, layer_kernel);
+#endif
+    printf("current clock: %d\n", global_clock);
+    printf("current layer: %d    %lld / %lld\n", current_layer, conved_points, total_points);
+    printf("    feature map: %d * %d * %d\n", current_map_side, current_map_side, layer_channel);
+    printf("    conv kernel: %d * %d * %d, count = %d\n", KERNEL_SIDE, KERNEL_SIDE, layer_channel, layer_kernel);
+
+    int sum = conved_points;
+    printf("  Start: %d\n", StartQueue.size());
+    printf("  ReqQueue: %d\n", ReqQueue.size());
+    printf("  PickQueue: %d\n", PickQueue.size());
+    printf("  ConvQueue: ");
+    for (int i = 0; i < layer_kernel; i++)
+    {
+        printf("%d%c", ConvQueue[i].size(), i == layer_kernel - 1 ? '\n' : ' ');
+        sum += ConvQueue[i].size();
+    }
+    printf("  Conv2SndFIFO: %d\n", Conv2SndFIFO.size());
+    printf("  SndQueue: %d\n", SndQueue.size());
+    printf("  Snd2SwitchFIFO: %d\n", Snd2SwitchFIFO.size());
+    printf("  SwitchQueue: %d\n", SwitchQueue.size());
+    printf("  Switch2NextLayer: %d\n", Switch2NextLayer.size());
+    sum += StartQueue.size()
+            + ReqQueue.size()
+            + PickQueue.size()
+            + Conv2SndFIFO.size()
+            + SndQueue.size();
+    printf("sum: %d\n", sum);
 }
 
-// ==================== Á÷³Ì¿ØÖÆ ===================
-// º¯ÊıÇ°ÖÃÉùÃ÷
+// ==================== æµç¨‹æ§åˆ¶ ===================
+// å‡½æ•°å‰ç½®å£°æ˜
 void inClock();
 void dataTransfer();
 void clockGoesBy();
 
 /**
- * ³õÊ¼»¯Ò»ÇĞËùĞèÒªµÄÄÚÈİ
+ * åˆå§‹åŒ–ä¸€åˆ‡æ‰€éœ€è¦çš„å†…å®¹
  */
 void initFlowControl()
 {
     initLayerResource();
-    feature_map = new FeatureMap(0, 224, 3);
+    feature_map = new FeatureMap(0, MAP_SIDE_MAX, MAP_CHANNEL_DEFULT);
 }
 
 /**
- * Ã¿¸öclockÔËĞĞÒ»´Î
+ * æ¯ä¸ªclockè¿è¡Œä¸€æ¬¡
  */
 void runFlowControl()
 {
     while (true)
     {
-//        Sleep(1); // Öğ²½ÏÔÊ¾Á÷¿Ø
+//        Sleep(1); // é€æ­¥æ˜¾ç¤ºæµæ§
 
         inClock();
 
-        // Èç¹û³¬¹ıÁË×îºóÒ»²ã£¬ÔòÍË³ö
+        // å¦‚æœè¶…è¿‡äº†æœ€åä¸€å±‚ï¼Œåˆ™é€€å‡º
         if (current_layer > MAX_LAYER)
             break;
     }
 }
 
 /**
- * Ò»¸öclockÖĞµÄ²Ù×÷
+ * ä¸€ä¸ªclockä¸­çš„æ“ä½œ
  */
 void inClock()
 {
     global_clock++;
-    picker_bandwdith = Picker_FullBandwidth; // bandwidthÂúÔØ
+    picker_bandwdith = Picker_FullBandwidth; // bandwidthæ»¡è½½
 
-    // ¿ªÆôĞÂµÄÒ»²ã£¬·Ö¸îÌØÕ÷Í¼
+    // å¼€å¯æ–°çš„ä¸€å±‚ï¼Œåˆ†å‰²ç‰¹å¾å›¾
     if (feature_map)
     {
         startNewLayer();
@@ -256,30 +280,30 @@ void inClock()
 
     clockGoesBy();
 
-    // ÅĞ¶ÏÈ«²¿µÄµãÊÇ·ñ´«Êä½áÊø
+    /*// åˆ¤æ–­å…¨éƒ¨çš„ç‚¹æ˜¯å¦ä¼ è¾“ç»“æŸ
     if (conved_points >= total_points)
     {
         generalNextLayerMap();
-    }
+    }*/
 }
 
 /**
- * Êı¾İ´«Êä
- * Èç¹ûhas_transfered£¬ÔòÖØĞÂ´Ë·½·¨
+ * æ•°æ®ä¼ è¾“
+ * å¦‚æœhas_transferedï¼Œåˆ™é‡æ–°æ­¤æ–¹æ³•
  */
 void dataTransfer()
 {
-    // Ê¹ÓÃ´Ëflag±ÜÃâÁË·Ç¶àÏß³ÌµÄÏÈºóË³ĞòÎÊÌâ
+    // ä½¿ç”¨æ­¤flagé¿å…äº†éå¤šçº¿ç¨‹çš„å…ˆåé¡ºåºé—®é¢˜
     has_transfered = false;
 
 
-    // ÌØÕ÷Í¼µÄµãµ½ReqFIFOºÍDatLatch
-    // ÓÉÓÚReqFIFOÔÚpickºó£¬ÓĞÖ¸ÕëÖ¸Ïòdata£¬dataÁ¢Âí¸ú×Å³öÀ´
-    // Á½¸öÊÇÁ¬ĞøµÄ£¬Ó¦¸Ã¿ÉÒÔ²»ÓÃ·Ö¿ª£¬Ö»Ê¹ÓÃÒ»¸ö¶ÓÁĞ
+    // ç‰¹å¾å›¾çš„ç‚¹åˆ°ReqFIFOå’ŒDatLatch
+    // ç”±äºReqFIFOåœ¨pickåï¼Œæœ‰æŒ‡é’ˆæŒ‡å‘dataï¼Œdataç«‹é©¬è·Ÿç€å‡ºæ¥
+    // ä¸¤ä¸ªæ˜¯è¿ç»­çš„ï¼Œåº”è¯¥å¯ä»¥ä¸ç”¨åˆ†å¼€ï¼Œåªä½¿ç”¨ä¸€ä¸ªé˜Ÿåˆ—
     while (ReqQueue.size() < ReqQueue_MaxSize && !StartQueue.empty())
     {
         DataPacket* packet = StartQueue.front();
-        StartQueue.erase(StartQueue.begin()); // É¾³ıÊ×ÔªËØ
+        StartQueue.erase(StartQueue.begin()); // åˆ é™¤é¦–å…ƒç´ 
 
         packet->resetDelay(Dly_inReqFIFO);
         DataPacket* req = packet;
@@ -292,49 +316,54 @@ void dataTransfer()
     }
 
     // ReqFIFI => ConvQueues
-    int start_picker_target = picker_tagret; // ¼ÇÂ¼µ±Ç°µÄpickerµÄÄ¿±ê£¬±ÜÃâÈ«²¿Ò»±éºóµÄËÀÑ­»·
-    while (picker_bandwdith > 0)
+    int start_picker_target = picker_tagret; // è®°å½•å½“å‰çš„pickerçš„ç›®æ ‡ï¼Œé¿å…å…¨éƒ¨ä¸€éåçš„æ­»å¾ªç¯
+    while (picker_bandwdith > 0 && ReqQueue.size())
     {
-        // Èç¹ûÊı¾İÊıÁ¿ÒÑ¾­´ïµ½ÁËÉÏÏŞ£¬ÔòÌø¹ıÕâ¸ökernel
+        // å¦‚æœå·ç§¯æ ¸æ•°æ®æ•°é‡å·²ç»è¾¾åˆ°äº†ä¸Šé™ï¼Œåˆ™è·³è¿‡è¿™ä¸ªkernel
         if (ConvQueue[picker_tagret].size() > ConvQueue_MaxSize)
         {
-            pickNextTarget(); // pickµ½ÏÂÒ»¸ù
-            if (picker_tagret == start_picker_target) // È«²¿ÂÖÑ¯ÁËÒ»±é¶¼²»ĞĞ£¬È¡Ïû±éÀú
-                break;
+            pickNextTarget(); // pickåˆ°ä¸‹ä¸€æ ¹
             continue;
         }
 
+        // åˆ¤æ–­æœ‰æ²¡æœ‰èƒ½pickåˆ°è¿™ä¸ªå·ç§¯æ ¸çš„æ•°æ®åŒ…
+        bool picked = false;
         for (int i = 0; i < ReqQueue.size(); i++)
         {
             DataPacket* packet = ReqQueue.at(i);
-            // packet ÑÓ³ÙÃ»ÓĞ½áÊø£»»òÕß¸ù±¾¾Í²»ÊÇÕâ¸ökernelµÄ
-            // £¨ÕâÑùµÄpickerµÄĞÔÄÜËÆºõ²»¸ß£©
+            // packet å»¶è¿Ÿæ²¡æœ‰ç»“æŸï¼›æˆ–è€…æ ¹æœ¬å°±ä¸æ˜¯è¿™ä¸ªkernelçš„
+            // ï¼ˆè¿™æ ·çš„pickerçš„æ€§èƒ½ä¼¼ä¹ä¸é«˜ï¼‰
             if (!packet->isDelayFinished() || packet->kernel_index != picker_tagret)
                 continue;
 
-            // packetÄÜ·¢ËÍ£¬kernelÄÜ½ÓÊÕ
-            // ¿ªÊ¼·¢ËÍ
-            PickQueue.push_back(packet); // ½øÈëPickÑÓ³Ù
+            // packetèƒ½å‘é€ï¼Œkernelèƒ½æ¥æ”¶
+            // å¼€å§‹å‘é€
             ReqQueue.erase(ReqQueue.begin() + i--);
+            PickQueue.push_back(packet); // è¿›å…¥Pickå»¶è¿Ÿ
             packet->resetDelay(Dly_onPick);
-            DEB("ÕıÔÚ pick ÖÁ Conv %d, Ê£Óàbandwidth:%d\n", picker_tagret, picker_bandwdith-1);
+            DEB("ReqFIFO pick => Conv %d, bandwidth:%d\n", picker_tagret, picker_bandwdith-1);
 
-            // ·¢ËÍºó¸÷ÖÖÊıÖµµÄ±ä»¯
+            // å‘é€åå„ç§æ•°å€¼çš„å˜åŒ–
             picker_bandwdith--;
             pickNextTarget();
             has_transfered = true;
+            picked = true;
             break;
         }
+        if (!picked) // æ²¡æœ‰èƒ½pickåˆ°è¿™ä¸ªå·ç§¯æ ¸çš„æ•°æ®åŒ…
+            pickNextTarget();
+        if (picker_tagret == start_picker_target) // å…¨éƒ¨è½®è¯¢äº†ä¸€ééƒ½ä¸è¡Œï¼Œå–æ¶ˆéå†
+            break;
     }
 
-    // PickÑÓ³Ù½áÊø£¬½øÈëConv
+    // Pickå»¶è¿Ÿç»“æŸï¼Œè¿›å…¥Conv
     for (int i = 0; i < PickQueue.size(); i++)
     {
         DataPacket* packet = PickQueue.at(i);
         if (!packet->isDelayFinished())
             continue;
 
-        // pickÑÓ³Ù½áÊø£¬½øÈëconv
+        // pickå»¶è¿Ÿç»“æŸï¼Œè¿›å…¥conv
         PickQueue.erase(PickQueue.begin() + i--);
         ConvQueue[packet->kernel_index].push_back(packet);
         packet->resetDelay(Dly_inConv);
@@ -343,15 +372,15 @@ void dataTransfer()
     }
 
 
-    /*// ĞèÇó±ä¸ü£ºConvPointsÓÃ²»µ½ÁË£¬ÒòÎª Conv ÕâĞ©²»ÔÙÊÇ´æ´¢µã£¬Ö»ÊÇµãµÄdelay
-    int start_picker_target = picker_tagret; // ¼ÇÂ¼µ±Ç°µÄpickerµÄÄ¿±ê£¬±ÜÃâÈ«²¿Ò»±éºóµÄËÀÑ­»·
+    /*// éœ€æ±‚å˜æ›´ï¼šConvPointsç”¨ä¸åˆ°äº†ï¼Œå› ä¸º Conv è¿™äº›ä¸å†æ˜¯å­˜å‚¨ç‚¹ï¼Œåªæ˜¯ç‚¹çš„delay
+    int start_picker_target = picker_tagret; // è®°å½•å½“å‰çš„pickerçš„ç›®æ ‡ï¼Œé¿å…å…¨éƒ¨ä¸€éåçš„æ­»å¾ªç¯
     while (picker_bandwdith > 0)
     {
-        // Èç¹ûÊı¾İµãµÄÊıÁ¿ÒÑ¾­´ïµ½ÁËÉÏÏŞ£¬ÔòÌø¹ıÕâ¸ökernel
+        // å¦‚æœæ•°æ®ç‚¹çš„æ•°é‡å·²ç»è¾¾åˆ°äº†ä¸Šé™ï¼Œåˆ™è·³è¿‡è¿™ä¸ªkernel
         if (ConvPoints[picker_tagret].size() >= ConvPoints_MaxSize)
         {
-            pickNextTarget(); // pickµ½ÏÂÒ»¸ù
-            if (picker_tagret == start_picker_target) // È«²¿ÂÖÑ¯ÁËÒ»±é¶¼²»ĞĞ£¬È¡Ïû±éÀú
+            pickNextTarget(); // pickåˆ°ä¸‹ä¸€æ ¹
+            if (picker_tagret == start_picker_target) // å…¨éƒ¨è½®è¯¢äº†ä¸€ééƒ½ä¸è¡Œï¼Œå–æ¶ˆéå†
                 break;
             continue;
         }
@@ -359,13 +388,13 @@ void dataTransfer()
         for (int i = 0; i < ReqQueue.size(); i++)
         {
             DataPacket* packet = ReqQueue.at(i);
-            // packet ÑÓ³ÙÃ»ÓĞ½áÊø£»»òÕß¸ù±¾¾Í²»ÊÇÕâ¸ökernelµÄ
-            // £¨ÕâÑùµÄpickerµÄĞÔÄÜËÆºõ²»¸ß£©
+            // packet å»¶è¿Ÿæ²¡æœ‰ç»“æŸï¼›æˆ–è€…æ ¹æœ¬å°±ä¸æ˜¯è¿™ä¸ªkernelçš„
+            // ï¼ˆè¿™æ ·çš„pickerçš„æ€§èƒ½ä¼¼ä¹ä¸é«˜ï¼‰
             if (!packet->isDelayFinished() || packet->kernel_index != picker_tagret)
                 continue;
 
-            // packetÄÜ·¢ËÍ£¬kernelÄÜ½ÓÊÕ
-            // ¿ªÊ¼·¢ËÍ
+            // packetèƒ½å‘é€ï¼Œkernelèƒ½æ¥æ”¶
+            // å¼€å§‹å‘é€
             PointVec vec = packet->points;
             for (unsigned int p = 0; p < vec.size(); p++)
             {
@@ -373,23 +402,23 @@ void dataTransfer()
             }
             DEB("ReqFIFO => Conv %d\n", picker_tagret);
 
-            // É¾³ıpacket±¾Éí£¨ÒÑ¾­²»ĞèÒªÕâ¸öpacketÁË£©
+            // åˆ é™¤packetæœ¬èº«ï¼ˆå·²ç»ä¸éœ€è¦è¿™ä¸ªpacketäº†ï¼‰
             ReqQueue.erase(ReqQueue.begin() + i--);
 
-            // ·¢ËÍºó¸÷ÖÖÊıÖµµÄ±ä»¯
+            // å‘é€åå„ç§æ•°å€¼çš„å˜åŒ–
             picker_bandwdith--;
             pickNextTarget();
         }
     }*/
 
 
-    // DatLatch Pick¸ø ConvQueue¡£ÒªÏÈÈ·¶¨ÏàÍ¬TagµÄReqÏÈ·¢ËÍ²ÅÄÜ·¢
-    // Data¸ú×ÅReq·¢ËÍ£¬²»ÓÃÔÙµ¥¶ÀÅĞ¶ÏÁË
+    // DatLatch Pickç»™ ConvQueueã€‚è¦å…ˆç¡®å®šç›¸åŒTagçš„Reqå…ˆå‘é€æ‰èƒ½å‘
+    // Dataè·Ÿç€Reqå‘é€ï¼Œä¸ç”¨å†å•ç‹¬åˆ¤æ–­äº†
     /*for (unsigned int i = 0; i < DatLatch.size(); i++)
     { }*/
 
 
-    // Ã¿¸ö ConvQueue ½«½á¹û·¢ËÍ¸ø SndFIFO
+    // æ¯ä¸ª ConvQueue å°†ç»“æœå‘é€ç»™ SndFIFO
     for (int i = 0; i < layer_kernel; i++)
     {
         FIFO& queue = ConvQueue[i];
@@ -408,7 +437,7 @@ void dataTransfer()
         }
     }
 
-    // Conv => SndFIFO µÄÑÓ³Ù
+    // Conv => SndFIFO çš„å»¶è¿Ÿ
     for (int i = 0; i < Conv2SndFIFO.size(); i++)
     {
         DataPacket* packet = Conv2SndFIFO.at(i);
@@ -422,21 +451,33 @@ void dataTransfer()
         has_transfered = true;
     }
 
-    // SndFIFO ´«ËÍµ½ switch
+    // SndFIFO ä¼ é€åˆ° switch
     for (int i = 0; i < SndQueue.size(); i++)
     {
         DataPacket* packet = SndQueue.at(i);
         if (!packet->isDelayFinished())
-            continue;
+            break;
 
-        SndQueue.erase(SndQueue.begin() + i--);
+        conved_points += packet->points.size(); // å®Œæˆçš„ç‚¹çš„æ•°é‡
+        SndQueue.erase(SndQueue.begin());
+
+        /*SndQueue.erase(SndQueue.begin() + i--);
         Snd2SwitchFIFO.push_back(packet);
         packet->resetDelay(Dly_Snd2Switch);
-        DEB("SndFIFO => Switch\n");
+        DEB("SndFIFO => Switch\n");*/
         has_transfered = true;
     }
 
-    // SndFIFO => Switch ÖĞÍ¾µÄ×ÜÑÓ³Ù
+    // å…¨éƒ¨å·ç§¯å®Œæ¯•
+    if (conved_points >= total_points)
+    {
+        DEB("convolution all completed %*\n", getchar());
+        DataPacket* packet = new DataPacket(Request);
+        Snd2SwitchFIFO.push_back(packet);
+        packet->resetDelay(Dly_Snd2Switch);
+    }
+
+    // SndFIFO => Switch ä¸­é€”çš„æ€»å»¶è¿Ÿ
     for (int i = 0; i < Snd2SwitchFIFO.size(); i++)
     {
         DataPacket* packet = Snd2SwitchFIFO.at(i);
@@ -450,7 +491,7 @@ void dataTransfer()
         has_transfered = true;
     }
 
-    // Switch·¢ËÍÖÁÏÂÒ»²ã
+    // Switchå‘é€è‡³ä¸‹ä¸€å±‚
     for (int i = 0; i < SwitchQueue.size(); i++)
     {
         DataPacket* packet = SwitchQueue.at(i);
@@ -464,30 +505,42 @@ void dataTransfer()
         has_transfered = true;
     }
 
-    for (int i = 0; i < Switch2NextLayer.size(); i++)
+    if (Switch2NextLayer.size())
+    {
+        DataPacket* packet = Switch2NextLayer.front();
+        if (packet->isDelayFinished())
+        {
+            Switch2NextLayer.clear();
+            delete packet;
+            generalNextLayerMap();
+        }
+    }
+    /*for (int i = 0; i < Switch2NextLayer.size(); i++)
     {
         DataPacket* packet = Switch2NextLayer.at(i);
         if (!packet->isDelayFinished())
             continue;
 
         Switch2NextLayer.erase(Switch2NextLayer.begin() + i--);
-        conved_points++;
+        conved_points += packet->points.size(); // å®Œæˆçš„ç‚¹çš„æ•°é‡
+        delete packet; // é¿å…å†…å­˜æ³„æ¼
         has_transfered = true;
-    }
+    }*/
 
 
-    // Èç¹ûÕâ¸öº¯ÊıÖĞÓĞÊı¾İ´«Êä
-    // ÄÇÃ´¼ÌĞøÖØĞÂ´«Êä
-    // ½â¾öµ¥Ïß³Ì»úÖÆÎŞ·¨Ä£Äâ¶àÏß³ÌµÄ¶àÊı¾İÍ¬²½´«ÊäÎÊÌâ
+    // å¦‚æœè¿™ä¸ªå‡½æ•°ä¸­æœ‰æ•°æ®ä¼ è¾“
+    // é‚£ä¹ˆç»§ç»­é‡æ–°ä¼ è¾“
+    // è§£å†³å•çº¿ç¨‹æœºåˆ¶æ— æ³•æ¨¡æ‹Ÿå¤šçº¿ç¨‹çš„å¤šæ•°æ®åŒæ­¥ä¼ è¾“é—®é¢˜
     if (has_transfered)
     {
-        dataTransfer(); // µİ¹éµ÷ÓÃ×Ô¼º£¬Ö±ÖÁ !has_transfered
+        // è¿™é‡Œå…¨éƒ½æ˜¯æŒ‰ç…§é¡ºåºæ¥çš„ï¼Œä¸éœ€è¦å†åˆ¤æ–­é¡ºåºäº†
+        // dataTransfer(); // é€’å½’è°ƒç”¨è‡ªå·±ï¼Œç›´è‡³ !has_transfered
     }
 }
 
 /**
- * Á÷ÊÅÁËÒ»¸öclock
- * ¼´ËùÓĞ¶ÓÁĞÖĞµÄpacketµÄdelay¶¼next
+ * æµé€äº†ä¸€ä¸ªclock
+ * å³æ‰€æœ‰é˜Ÿåˆ—ä¸­çš„packetçš„delayéƒ½next
  */
 void clockGoesBy()
 {
@@ -538,8 +591,8 @@ void clockGoesBy()
 }
 
 /**
- * Õû¸öÁ÷¿Ø½áÊø
- * ÔÚÕâÀïÊä³ö¸÷ÖÖ½á¹û
+ * æ•´ä¸ªæµæ§ç»“æŸ
+ * åœ¨è¿™é‡Œè¾“å‡ºå„ç§ç»“æœ
  */
 void finishFlowControl()
 {

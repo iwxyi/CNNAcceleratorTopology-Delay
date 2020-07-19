@@ -1,8 +1,13 @@
 #ifndef DATAPACKET_H
 #define DATAPACKET_H
 
-#include <windows.h>
 #include <vector>
+#include <QApplication>
+#ifdef Q_OS_WIN
+#include <windows.h>
+#else
+    #define INT8 char
+#endif
 
 typedef int DataType;
 typedef int TagType;

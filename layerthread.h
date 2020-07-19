@@ -1,6 +1,6 @@
 /**
-  * ÅĞ¶Ïµ±Ç°¾í»ıÔÚÄÄÒ»²ã
-  * ¹ÜÀí¾í»ıµÄÏß³Ì
+  * åˆ¤æ–­å½“å‰å·ç§¯åœ¨å“ªä¸€å±‚
+  * ç®¡ç†å·ç§¯çš„çº¿ç¨‹
   */
 
 #ifndef LAYERTHREAD_H
@@ -12,29 +12,29 @@
 #include <algorithm>
 #include "convolution.h"
 
-int current_layer = 0;   // µ±Ç°Õı´¦ÔÚµÚ¼¸²ã
-int layer_channel = 3;   // µ±Ç°²ãÍ¼Æ¬Éî¶È£¬¼´channelÊıÁ¿
-int layer_kernel = 3;    // µ±Ç°²ãµÄkernel×ÜÊıÁ¿
-int finished_kernel = 0; // µ±Ç°²ã½áÊøµÄkernelÊıÁ¿
-std::vector<pthread_t*> conv_thread;   // ×ÓÏß³Ì¶ÔÏó
-std::vector<FeatureMap*> feature_maps; // Ã¿ÕÅÍ¼
+int current_layer = 0;   // å½“å‰æ­£å¤„åœ¨ç¬¬å‡ å±‚
+int layer_channel = 3;   // å½“å‰å±‚å›¾ç‰‡æ·±åº¦ï¼Œå³channelæ•°é‡
+int layer_kernel = 3;    // å½“å‰å±‚çš„kernelæ€»æ•°é‡
+int finished_kernel = 0; // å½“å‰å±‚ç»“æŸçš„kernelæ•°é‡
+std::vector<pthread_t*> conv_thread;   // å­çº¿ç¨‹å¯¹è±¡
+std::vector<FeatureMap*> feature_maps; // æ¯å¼ å›¾
 
 /**
- * ³õÊ¼»¯µÚ0²ã£¨Ä¬ÈÏ£©µÄÊı¾İ
- * ÒÔ¼°´«ÈëµÄÍ¼Æ¬Öµ
+ * åˆå§‹åŒ–ç¬¬0å±‚ï¼ˆé»˜è®¤ï¼‰çš„æ•°æ®
+ * ä»¥åŠä¼ å…¥çš„å›¾ç‰‡å€¼
  */
 void initLayerResource()
 {
-    current_layer = 0;   // µÚ0²ã
+    current_layer = 0;   // ç¬¬0å±‚
     layer_channel = 3;
     layer_kernel = 3;
-    finished_kernel = 3; // µÚ0²ãµÄkernelÊı=µÚ1²ãµÄchannel=3
-    feature_maps.push_back(new FeatureMap(0, MAP_SIDE_MAX, MAP_CHANNEL_DEFULT)); // Ä¬ÈÏ224*224*3µÄÍ¼
+    finished_kernel = 3; // ç¬¬0å±‚çš„kernelæ•°=ç¬¬1å±‚çš„channel=3
+    feature_maps.push_back(new FeatureMap(0, MAP_SIDE_MAX, MAP_CHANNEL_DEFULT)); // é»˜è®¤224*224*3çš„å›¾
 }
 
 /**
- * »ñÈ¡¾í»ıºËµÄÊıÁ¿
- * ÆäÊµÃ¿Ò»²ãÊıÁ¿¾ÍÊÇÉÏÒ»²ãµÄÊıÁ¿
+ * è·å–å·ç§¯æ ¸çš„æ•°é‡
+ * å…¶å®æ¯ä¸€å±‚æ•°é‡å°±æ˜¯ä¸Šä¸€å±‚çš„æ•°é‡
  * 3*3*3 -> 3*3*8 -> 16 -> 32 -> 32 -> 32...
  */
 inline int getKernelCount(int layer)
@@ -54,30 +54,30 @@ inline int getKernelCount(int layer)
 
 
 /**
- * µ¥¸ö¾í»ıºË½øĞĞ¾í»ıµÄÏß³Ì
- * @return ¾í»ı³öÀ´µÄchnnelÕÅÍ¼£¬ºÏ²¢³É1ÕÅ
+ * å•ä¸ªå·ç§¯æ ¸è¿›è¡Œå·ç§¯çš„çº¿ç¨‹
+ * @return å·ç§¯å‡ºæ¥çš„chnnelå¼ å›¾ï¼Œåˆå¹¶æˆ1å¼ 
  */
 void *convolutionThread(void *_arg)
 {
-    pthread_detach(pthread_self()); // unjoinable£¬·Ç×èÈû£¬ÔËĞĞ½áÊøºóÍË³ö
+    pthread_detach(pthread_self()); // unjoinableï¼Œéé˜»å¡ï¼Œè¿è¡Œç»“æŸåé€€å‡º
     ConvThreadArg* arg = (ConvThreadArg*) _arg;
     FeatureMap* map = arg->map;
     Kernel* kernel = arg->kernel;
-    printf("> ¿ªÊ¼¾í»ı×ÓÏß³Ì: kernel: %d\n", arg->k_indx);
+    printf("> start convolution thread, kernel: %d\n", arg->k_indx);
     if (map)
-        printf("    ÌØÕ÷Í¼: %d * %d * %d\n", map->side, map->side, map->channel);
+        printf("    feature map: %d * %d * %d\n", map->side, map->side, map->channel);
     if (kernel)
-        printf("    ¾í»ıºË: %d * %d * %d\n", kernel->side, kernel->side, kernel->channel);
+        printf("    conv kernel: %d * %d * %d\n", kernel->side, kernel->side, kernel->channel);
 
-    // ¿ªÊ¼¾í»ı
+    // å¼€å§‹å·ç§¯
     FeatureMap *result = convolution(map, kernel);
 
-    // ½á¹ûÒª´«µİµ½ÏÂÒ»²ã
+    // ç»“æœè¦ä¼ é€’åˆ°ä¸‹ä¸€å±‚
     feature_maps.push_back(result);
     finished_kernel++;
 
-    printf("- ¾í»ı½áÊø: kernel: %d\n", arg->k_indx);
-    // ÊÍ·Å×ÊÔ´
+    printf("- conv finished: kernel: %d\n", arg->k_indx);
+    // é‡Šæ”¾èµ„æº
     delete arg;
     delete map;
     pthread_exit(0);
@@ -85,18 +85,18 @@ void *convolutionThread(void *_arg)
 }
 
 /**
- * ÊÍ·ÅÉÏÒ»²ãÊ±new³öÀ´µÄÊı¾İ
+ * é‡Šæ”¾ä¸Šä¸€å±‚æ—¶newå‡ºæ¥çš„æ•°æ®
  */
 void releasePrevLayerResource()
 {
-    // ÊÍ·ÅÉÏÒ»²ãÖ¸Õë½á¹û
+    // é‡Šæ”¾ä¸Šä¸€å±‚æŒ‡é’ˆç»“æœ
     while (!feature_maps.empty())
     {
         delete feature_maps.back();
         feature_maps.pop_back();
     }
 
-    // ÊÍ·ÅÉÏÒ»²ãµÄÏß³Ì
+    // é‡Šæ”¾ä¸Šä¸€å±‚çš„çº¿ç¨‹
     while (!conv_thread.empty())
     {
         pthread_join(*conv_thread.back(), NULL);
@@ -105,38 +105,38 @@ void releasePrevLayerResource()
 }
 
 /**
- * »ñÈ¡Ã¿Ò»²ãºÏ²¢ºóµÄMAP
-* @return Èç¹ûÕıÔÚ¶àÏß³Ì¼ÆËãÖĞ£¬µ¼ÖÂÃ»ÓĞ¿ÉºÏ²¢µÄmap£¬Ôò·µ»ØNULL
+ * è·å–æ¯ä¸€å±‚åˆå¹¶åçš„MAP
+* @return å¦‚æœæ­£åœ¨å¤šçº¿ç¨‹è®¡ç®—ä¸­ï¼Œå¯¼è‡´æ²¡æœ‰å¯åˆå¹¶çš„mapï¼Œåˆ™è¿”å›NULL
  */
 FeatureMap* getMergedMap()
 {
-    // ÕâÀïÈ·±£ finished_kernel == kernel_count == feature_maps.count(), ÇÒ > 0
-    if (finished_kernel < layer_kernel) // ¶àÏß³ÌÎ´Íê³É£¬ÎŞºÏ²¢µÄÍ¼£¬·µ»ØNULL
+    // è¿™é‡Œç¡®ä¿ finished_kernel == kernel_count == feature_maps.count(), ä¸” > 0
+    if (finished_kernel < layer_kernel) // å¤šçº¿ç¨‹æœªå®Œæˆï¼Œæ— åˆå¹¶çš„å›¾ï¼Œè¿”å›NULL
         return NULL;
 
-    // ºÏ²¢FeatureMap
+    // åˆå¹¶FeatureMap
     FeatureMap* map = NULL;
-    if (current_layer <= 0) // ³õ´ÎÊ¹ÓÃ£¬²»ÓÃÕâÃ´¶àµÄ²Ù×÷
+    if (current_layer <= 0) // åˆæ¬¡ä½¿ç”¨ï¼Œä¸ç”¨è¿™ä¹ˆå¤šçš„æ“ä½œ
     {
         map = feature_maps.front();
-        feature_maps.clear(); // map»¹ĞèÒªÓÃµ½£¬²»ÓÃdelete
-        printf("³õÊ¼ÌØÕ÷Í¼£º%d * %d * %d\n", map->side, map->side, map->channel);
+        feature_maps.clear(); // mapè¿˜éœ€è¦ç”¨åˆ°ï¼Œä¸ç”¨delete
+        printf("init feature map: %d * %d * %d\n", map->side, map->side, map->channel);
     }
     else
     {
-        // ºÏ²¢ÉÏÒ»²ãÃ¿¸ökernelµÄFeatureMap
+        // åˆå¹¶ä¸Šä¸€å±‚æ¯ä¸ªkernelçš„FeatureMap
         std::vector<FeatureMap*> prev_map = feature_maps;
-        // °´¸÷Ïß³ÌkernelË³Ğò½øĞĞÅÅĞò£¬ÓĞĞòºÏ²¢
+        // æŒ‰å„çº¿ç¨‹kernelé¡ºåºè¿›è¡Œæ’åºï¼Œæœ‰åºåˆå¹¶
         std::sort(prev_map.begin(), prev_map.end(), [=](FeatureMap* a, FeatureMap* b){
             return a->kernel < b->kernel;
         });
 
         int side = prev_map.front()->side;
         map = new FeatureMap(0, side, layer_channel);
-        printf("ºÏ²¢ÌØÕ÷Í¼£º%d * %d * %d\n", side, side, layer_channel);
+        printf("result feature map: %d * %d * %d\n", side, side, layer_channel);
         for (int i = 0; i < layer_channel; i++)
         {
-            // memcpy(map->map[i], prev_map.at(i)->map[0], sizeof(INT8)*side*side); // ²»ÊÇÁ¬ĞøÄÚ´æ£¬ÎŞ·¨cpy
+            // memcpy(map->map[i], prev_map.at(i)->map[0], sizeof(INT8)*side*side); // ä¸æ˜¯è¿ç»­å†…å­˜ï¼Œæ— æ³•cpy
             INT8*** p_map = prev_map.at(i)->map;
             for (int y = 0; y < side; y++)
             {
@@ -153,8 +153,8 @@ FeatureMap* getMergedMap()
 }
 
 /**
- * ÅĞ¶Ï¶àÏß³Ì¾í»ıµÄÈÎÎñ½ø¶È
- * @return falseÊ±Ïß³ÌÎ´½áÊø£»trueÊ±±íÊ¾Ïß³Ì½áÊø
+ * åˆ¤æ–­å¤šçº¿ç¨‹å·ç§¯çš„ä»»åŠ¡è¿›åº¦
+ * @return falseæ—¶çº¿ç¨‹æœªç»“æŸï¼›trueæ—¶è¡¨ç¤ºçº¿ç¨‹ç»“æŸ
  */
 bool judgeConvolutionThreads()
 {
@@ -162,29 +162,29 @@ bool judgeConvolutionThreads()
     if (!map)
         return false;
 
-    // ×î¶à MAX_LAYER ²ã(Ä¿Ç°32)
+    // æœ€å¤š MAX_LAYER å±‚(ç›®å‰32)
     if (current_layer >= MAX_LAYER)
     {
-        // ½á¹û¶¼ÔÚÉÏÃæµÄµÄÌØÕ÷Í¼mapÖĞ¡£ÔİÊ±Ã»ÓĞÊä³ö
-        printf("È«²¿ÔËĞĞ½áÊø");
+        // ç»“æœéƒ½åœ¨ä¸Šé¢çš„çš„ç‰¹å¾å›¾mapä¸­ã€‚æš‚æ—¶æ²¡æœ‰è¾“å‡º
+        printf("å…¨éƒ¨è¿è¡Œç»“æŸ");
         return true;
     }
 
-    // ½øÈëÏÂÒ»²ã
+    // è¿›å…¥ä¸‹ä¸€å±‚
     current_layer++;
-    layer_channel = getKernelCount(current_layer-1); // µ±Ç°²ãµÄchannel=ÉÏÒ»²ãµÄkernel
+    layer_channel = getKernelCount(current_layer-1); // å½“å‰å±‚çš„channel=ä¸Šä¸€å±‚çš„kernel
     layer_kernel = getKernelCount(current_layer);
-    printf("\n================ ½øÈëµÚ%d²ã ================\n\n", current_layer);
+    printf("\n================ layer:%d ================\n\n", current_layer);
     printf("kernel count = %d\n", layer_kernel);
 
-    // ¿ªÆô¶àÏß³Ì
-    finished_kernel = 0; // ÒÑÍê³ÉµÄÏß³ÌÊıÁ¿ÖØÖÃÎª0
+    // å¼€å¯å¤šçº¿ç¨‹
+    finished_kernel = 0; // å·²å®Œæˆçš„çº¿ç¨‹æ•°é‡é‡ç½®ä¸º0
     for (int k = 0; k < layer_kernel; k++)
     {
-        // ´´½¨È«¿ÕÊı¾İ£¨Í¼+ºË£©¡£ÔÚÏß³Ì½áÊøµÄÊ±ºòdeleteµô
+        // åˆ›å»ºå…¨ç©ºæ•°æ®ï¼ˆå›¾+æ ¸ï¼‰ã€‚åœ¨çº¿ç¨‹ç»“æŸçš„æ—¶å€™deleteæ‰
         ConvThreadArg* arg = new ConvThreadArg(current_layer, k+1, new FeatureMap(k+1, map), new Kernel(KERNEL_SIDE, layer_channel));
 
-        // ´«Èë¶àÏß³Ì¡£¸Ã²ã×ÓÏß³ÌÈ«²¿½áÊøºóÍ³Ò»ÊÍ·Å
+        // ä¼ å…¥å¤šçº¿ç¨‹ã€‚è¯¥å±‚å­çº¿ç¨‹å…¨éƒ¨ç»“æŸåç»Ÿä¸€é‡Šæ”¾
         pthread_t* thread = new pthread_t;
         conv_thread.push_back(thread);
         int ret = pthread_create(thread, NULL, convolutionThread, (void*)arg);
