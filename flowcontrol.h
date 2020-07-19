@@ -12,6 +12,7 @@
 #define FLOWCONTR_H
 
 #include <list>
+#include <time.h>
 #include "datapacket.h"
 #include "layerthread.h"
 #include "delaydefine.h"
@@ -24,6 +25,7 @@ typedef std::vector<DataPacket*> FIFO;
 // 从一开始到现在经过的clock
 ClockType global_clock = 0;
 int layer_start_clock = 0;
+clock_t start_time;
 // 某一个clock是否有数据流传输，若有则继续重新判断整个传输流程
 // 使用此flag解决单线程机制无法模拟多线程的多数据同步传输问题
 bool has_transfered = false;
@@ -195,10 +197,11 @@ void printState()
     // system("cls"); // 非常非常损耗性能，会降低近百倍速度
 #else
     // system("clear"); // 非常非常损耗性能，会降低近百倍速度
-    // printf("\033c");
+    printf("\033c"); // 这句清屏命令不吃性能
 #endif
-    printf("current clock: %d\n", global_clock);
-    printf("current layer: %d    %lld / %lld (%.4f%%)\n", current_layer, conved_points, total_points, conved_points*100.0/total_points);
+    printf("\ncurrent clock: %d\n", global_clock);
+    printf("current layer: %d    %lld / %lld (%.4f%%)\n", current_layer, conved_points, total_points,
+           total_points == 0 ? 100 : conved_points*100.0/total_points);
     printf("    feature map: %d * %d * %d\n", current_map_side, current_map_side, layer_channel);
     printf("    conv kernel: %d * %d * %d, count = %d\n", KERNEL_SIDE, KERNEL_SIDE, layer_channel, layer_kernel);
 
@@ -264,6 +267,7 @@ void initFlowControl()
 {
     initLayerResource();
     feature_map = new FeatureMap(0, MAP_SIDE_MAX, MAP_CHANNEL_DEFULT);
+    start_time = clock();
 }
 
 /**
@@ -278,7 +282,7 @@ void runFlowControl()
         inClock();
 
         // 如果超过了最后一层，则退出
-        if (current_layer > MAX_LAYER)
+        if (current_layer >= MAX_LAYER && feature_map)
             break;
     }
 }
@@ -610,7 +614,8 @@ void clockGoesBy()
  */
 void finishFlowControl()
 {
-
+    clock_t end = (clock() - start_time)/CLOCKS_PER_SEC;
+    printf("use time: %d s\n", end);
 }
 
 
