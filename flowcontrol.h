@@ -84,6 +84,7 @@ void splitMap2Queue(FeatureMap* map, Kernel* kernel, FIFO& queue)
     }
 
     current_map_side = map->side;
+    conved_points = 0;
     total_points = points.size() * layer_kernel; // 全部要处理的点的数量
 
     // 将每个点打包成能够发送的数据包
@@ -203,10 +204,11 @@ void printState()
     system("cls");
 #endif
     printf("current clock: %d\n", global_clock);
-    printf("current layer: %d    %lld / %lld\n", current_layer, conved_points, total_points);
+    printf("current layer: %d    %lld / %lld (%.4f%%)\n", current_layer, conved_points, total_points, conved_points*100.0/total_points);
     printf("    feature map: %d * %d * %d\n", current_map_side, current_map_side, layer_channel);
     printf("    conv kernel: %d * %d * %d, count = %d\n", KERNEL_SIDE, KERNEL_SIDE, layer_channel, layer_kernel);
 
+    return ;
     int sum = conved_points;
     int start_points = 0;
     for (int i = 0; i < StartQueue.size(); i++)
@@ -228,7 +230,7 @@ void printState()
         int kernel_points = 0;
         for (int i = 0; i < queue.size(); i++)
         {
-            printf("*");
+//            printf("*"); // 用来刷新缓冲区
             kernel_points += queue.at(i)->points.size();
         }
         printf("%d(%d)%c", queue.size(), kernel_points, i < layer_kernel - 1 ? ' ' : '\n');
@@ -292,7 +294,7 @@ void runFlowControl()
  */
 void inClock()
 {
-    getchar(); // 使用阻塞式输入来让一个clock一个clock的走过去
+//    getchar(); // 使用阻塞式输入来让一个clock一个clock的走过去
 
     global_clock++;
     picker_bandwdith = Picker_FullBandwidth; // bandwidth满载
@@ -302,18 +304,15 @@ void inClock()
     {
         startNewLayer();
         printState();
-        getchar();
+//        printf("\n========== press enter to start new layer ======\n");
+//        getchar();
     }
 
     dataTransfer();
 
     clockGoesBy();
 
-    /*// 判断全部的点是否传输结束
-    if (conved_points >= total_points)
-    {
-        generalNextLayerMap();
-    }*/
+    printState();
 }
 
 /**
@@ -499,9 +498,10 @@ void dataTransfer()
     }
 
     // 全部卷积完毕
-    if (conved_points >= total_points)
+    if (total_points > 0 && conved_points >= total_points)
     {
-        DEB("convolution all completed %*\n", getchar());
+        conved_points = total_points = 0;
+        DEB("convolution all completed\n");
         DataPacket* packet = new DataPacket(Request);
         Snd2SwitchFIFO.push_back(packet);
         packet->resetDelay(Dly_Snd2Switch);
@@ -616,8 +616,6 @@ void clockGoesBy()
     {
         Switch2NextLayer[i]->delayToNext();
     }
-
-    printState();
 }
 
 /**
