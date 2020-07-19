@@ -23,7 +23,7 @@
 #define ConvPoints_MaxSize 1600 // 要卷积的点的集合数量上限，要计算的话，至少要3*3*3*32
 #define ConvQueue_MaxSize 2     // 卷积核存储的最大的大小
 
-#define DEB if(1) printf
+#define DEB if (0) printf
 typedef int ClockType;
 typedef std::vector<DataPacket*> FIFO;
 
@@ -208,25 +208,50 @@ void printState()
     printf("    conv kernel: %d * %d * %d, count = %d\n", KERNEL_SIDE, KERNEL_SIDE, layer_channel, layer_kernel);
 
     int sum = conved_points;
-    printf("  Start: %d\n", StartQueue.size());
-    printf("  ReqQueue: %d\n", ReqQueue.size());
-    printf("  PickQueue: %d\n", PickQueue.size());
+    int start_points = 0;
+    for (int i = 0; i < StartQueue.size(); i++)
+        start_points += StartQueue.at(i)->points.size();
+    printf("  Start: %d(%d)\n", StartQueue.size(), start_points);
+    int req_points = 0;
+    for (int i = 0; i < ReqQueue.size(); i++)
+        req_points += ReqQueue.at(i)->points.size();
+    printf("  ReqQueue: %d(%d)\n", ReqQueue.size(), req_points);
+    int pick_points = 0;
+    for (int i = 0; i < PickQueue.size(); i++)
+        pick_points += PickQueue.at(i)->points.size();
+    printf("  PickQueue: %d(%d)\n", PickQueue.size(), pick_points);
     printf("  ConvQueue: ");
+    int conv_points = 0;
     for (int i = 0; i < layer_kernel; i++)
     {
-        printf("%d%c", ConvQueue[i].size(), i == layer_kernel - 1 ? '\n' : ' ');
-        sum += ConvQueue[i].size();
+        FIFO& queue = ConvQueue[i];
+        int kernel_points = 0;
+        for (int i = 0; i < queue.size(); i++)
+        {
+            printf("*");
+            kernel_points += queue.at(i)->points.size();
+        }
+        printf("%d(%d)%c", queue.size(), kernel_points, i < layer_kernel - 1 ? ' ' : '\n');
+        conv_points += kernel_points;
     }
-    printf("  Conv2SndFIFO: %d\n", Conv2SndFIFO.size());
-    printf("  SndQueue: %d\n", SndQueue.size());
+    int conv2snd_points = 0;
+    for (int i = 0; i < Conv2SndFIFO.size(); i++)
+        conv2snd_points += Conv2SndFIFO.at(i)->points.size();
+    printf("  Conv2SndFIFO: %d(%d)\n", Conv2SndFIFO.size(), conv2snd_points);
+    int snd_points = 0;
+    for (int i = 0; i < SndQueue.size(); i++)
+        snd_points += SndQueue.at(i)->points.size();
+    printf("  SndQueue: %d(%d)\n", SndQueue.size(), snd_points);
     printf("  Snd2SwitchFIFO: %d\n", Snd2SwitchFIFO.size());
     printf("  SwitchQueue: %d\n", SwitchQueue.size());
     printf("  Switch2NextLayer: %d\n", Switch2NextLayer.size());
-    sum += StartQueue.size()
-            + ReqQueue.size()
-            + PickQueue.size()
-            + Conv2SndFIFO.size()
-            + SndQueue.size();
+
+    sum += start_points
+            + req_points
+            + pick_points
+            + conv_points
+            + conv2snd_points
+            + snd_points;
     printf("sum: %d\n", sum);
 }
 
@@ -267,6 +292,8 @@ void runFlowControl()
  */
 void inClock()
 {
+    getchar(); // 使用阻塞式输入来让一个clock一个clock的走过去
+
     global_clock++;
     picker_bandwdith = Picker_FullBandwidth; // bandwidth满载
 
@@ -274,6 +301,8 @@ void inClock()
     if (feature_map)
     {
         startNewLayer();
+        printState();
+        getchar();
     }
 
     dataTransfer();
@@ -459,7 +488,8 @@ void dataTransfer()
             break;
 
         conved_points += packet->points.size(); // 完成的点的数量
-        SndQueue.erase(SndQueue.begin());
+        SndQueue.erase(SndQueue.begin() + i--);
+        delete packet;
 
         /*SndQueue.erase(SndQueue.begin() + i--);
         Snd2SwitchFIFO.push_back(packet);
