@@ -201,7 +201,11 @@ void generalNextLayerMap()
 void printState()
 {
 #ifdef Q_OS_WIN
-    system("cls");
+    // 实测跑第一层，不加清屏是90s，加了约8000s
+    // system("cls"); // 非常非常损耗性能，会降低近百倍速度
+#else
+    // system("clear"); // 非常非常损耗性能，会降低近百倍速度
+    // printf("\033c");
 #endif
     printf("current clock: %d\n", global_clock);
     printf("current layer: %d    %lld / %lld (%.4f%%)\n", current_layer, conved_points, total_points, conved_points*100.0/total_points);
