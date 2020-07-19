@@ -85,7 +85,7 @@ void splitMap2Queue(FeatureMap* map, Kernel* kernel, FIFO& queue)
 
     current_map_side = map->side;
     conved_points = 0;
-    total_points = points.size() * layer_kernel; // 全部要处理的点的数量
+    total_points = points.size(); // 全部要处理的点的数量
 
     // 将每个点打包成能够发送的数据包
     // 存储在预备发送的队列中
@@ -104,23 +104,18 @@ void splitMap2Queue(FeatureMap* map, Kernel* kernel, FIFO& queue)
             vec.push_back(points[i++]);
         }
 
-        // 创建当前层kernel数量个除了Kernel索引外都一模一样的数据包
-        // 因为同一个点会被许多个不同的卷积核读取
-        for (int knl = 0; knl < layer_kernel; knl++)
-        {
-            DataPacket* packet = new DataPacket(m[y][x][z]);
-            packet->ImgID = (INT8)z;
-            packet->CubeID = (INT8)y;
-            packet->SubID = (INT8)x;
-            // Tag暂时为三个ID拼接，确保每个packet的Tag都不相同
-            packet->Tag = (packet->ImgID << 16)
-                    + (packet->CubeID << 8)
-                    + (packet->SubID);
-            packet->kernel_index = knl; // 指向将要被发送的kernel索引，从0开始
-            packet->points = vec;
-            packet->resetDelay(Dly_inReqFIFO);
-            queue.push_back(packet);
-        }
+        // 将点打包成数据包
+        DataPacket* packet = new DataPacket(m[y][x][z]);
+        packet->ImgID = (INT8)z;
+        packet->CubeID = (INT8)y;
+        packet->SubID = (INT8)x;
+        // Tag暂时为三个ID拼接，确保每个packet的Tag都不相同
+        packet->Tag = (packet->ImgID << 16)
+                + (packet->CubeID << 8)
+                + (packet->SubID);
+        packet->points = vec;
+        packet->resetDelay(Dly_inReqFIFO);
+        queue.push_back(packet);
     }
 }
 
@@ -365,13 +360,14 @@ void dataTransfer()
             DataPacket* packet = ReqQueue.at(i);
             // packet 延迟没有结束；或者根本就不是这个kernel的
             // （这样的picker的性能似乎不高）
-            if (!packet->isDelayFinished() || packet->kernel_index != picker_tagret)
+            if (!packet->isDelayFinished())
                 continue;
 
             // packet能发送，kernel能接收
             // 开始发送
             ReqQueue.erase(ReqQueue.begin() + i--);
             PickQueue.push_back(packet); // 进入Pick延迟
+            packet->kernel_index = picker_tagret;
             packet->resetDelay(Dly_onPick);
             DEB("ReqFIFO pick => Conv %d, bandwidth:%d\n", picker_tagret, picker_bandwdith-1);
 
