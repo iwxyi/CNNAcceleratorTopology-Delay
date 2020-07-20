@@ -219,25 +219,25 @@ void printState()
 
     if (PRINT_EVERY)
     {
-        printf("  Start: %d\n", StartQueue.size());
-        printf("  ReqQueue: %d    \n", ReqQueue.size());
-        printf("  PickQueue: %d    \n", PickQueue.size());
-        printf("  ConvWaiting: ");
+        printf("  Start       : %d\n", StartQueue.size());
+        printf("  ReqFIFI     : %d    \n", ReqQueue.size());
+        printf("  PickFIFO    : %d    \n", PickQueue.size());
+        printf("      picking : ");
         for (int i = 0; i < layer_kernel; i++)
         {
             printf("%d%c", ConvWaiting[i], i < layer_kernel - 1 ? ' ' : '\n');
         }
-        printf("  ConvQueue: ");
+        printf("  ConvFIFO    : ");
         for (int i = 0; i < layer_kernel; i++)
         {
             FIFO& queue = ConvQueue[i];
             printf("%d%c", queue.size(), i < layer_kernel - 1 ? ' ' : '\n');
         }
         printf("  Conv2SndFIFO: %d    \n", Conv2SndFIFO.size());
-        printf("  SndQueue: %d    \n", SndQueue.size());
-        printf("  Snd2SwitchFIFO: %d    \n", Snd2SwitchFIFO.size());
-        printf("  SwitchQueue: %d    \n", SwitchQueue.size());
-        printf("  Switch2NextLayer: %d    \n", Switch2NextLayer.size());
+        printf("  SndFIFO     : %d    \n", SndQueue.size());
+        printf("  Snd2Switch  : %d    \n", Snd2SwitchFIFO.size());
+        printf("  SwitchFIFO  : %d    \n", SwitchQueue.size());
+        printf("  toNewLayer  : %d    \n", Switch2NextLayer.size());
     }
     else if (DEB_MODE)
     {
@@ -391,6 +391,7 @@ void dataTransfer()
             {
                 if (!round_picked) // 轮询了一整圈都没有pick，退出该循环
                     break;
+                round_picked = false;
             }
             continue; // 寻找下一个能pick的卷积核
         }
@@ -574,7 +575,7 @@ void dataTransfer()
     if (has_transfered)
     {
         // 这里全都是按照顺序来的，不需要再判断顺序了
-        // dataTransfer(); // 递归调用自己，直至 !has_transfered
+        dataTransfer(); // 递归调用自己，直至 !has_transfered
     }
 }
 

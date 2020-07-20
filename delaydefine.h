@@ -4,7 +4,7 @@
 // 各种模块
 #define PacketPointCount 2      // 每个req数据包带有几个点的数量
 #define ReqQueue_MaxSize 24     // ReqQueue数据量上限
-#define Picker_FullBandwidth 16  // 1个clock进行pick的数据数量
+#define Picker_FullBandwidth 8  // 1个clock进行pick的数据数量
 #define ConvQueue_MaxSize 1     // 卷积核存储的数据包最大的大小
 
 // 各种delay
