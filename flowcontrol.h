@@ -370,15 +370,16 @@ void dataTransfer()
         DatLatch.push_back(data);*/
         DEB("Start %d => ReqFIFO + DatLatch\n", req->Tag);
     }
-
     // ReqFIFI => ConvQueues
     int start_picker_target = picker_tagret; // 记录当前的picker的目标，避免全部一遍后的死循环
     while (picker_bandwdith > 0 && ReqQueue.size())
     {
         // 如果卷积核数据数量已经达到了上限，则跳过这个kernel
-        if (ConvQueue[picker_tagret].size() - Dly_onPick + Dly_inConv > ConvQueue_MaxSize)
+        if (ConvQueue[picker_tagret].size() > ConvQueue_MaxSize)
         {
             pickNextTarget(); // pick到下一根
+            if (picker_tagret == start_picker_target) // 全部轮询了一遍都不行，取消遍历
+                break;
             continue;
         }
 
@@ -482,6 +483,7 @@ void dataTransfer()
         Snd2SwitchFIFO.push_back(packet);
         packet->resetDelay(Dly_Snd2Switch);
         DEB("SndFIFO => Switch\n");*/
+        DEB("SndFIFO calculated\n");
         has_transfered = true;
     }
 
