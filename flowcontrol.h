@@ -45,6 +45,7 @@ FIFO ReqQueue;   // 特征图的每一点req的队列；tag和data相同
 FIFO PickQueue; // pick后进行delay的队列
 //PointVec ConvPoints[KERNEL_MAX_COUNT]; // 卷积数据等待队列
 FIFO ConvQueue[KERNEL_MAX_COUNT]; // 每个卷积结果队列
+int ConvWaiting[KERNEL_MAX_COUNT]; // 等待pick到卷积队列的数量
 FIFO Conv2SndFIFO; // Conv => SndFIFO
 FIFO SndQueue;   // 合并后的数据队列，发送到下一层
 FIFO Snd2SwitchFIFO;
@@ -221,6 +222,11 @@ void printState()
         printf("  Start: %d\n", StartQueue.size());
         printf("  ReqQueue: %d    \n", ReqQueue.size());
         printf("  PickQueue: %d    \n", PickQueue.size());
+        printf("  ConvWaiting: ");
+        for (int i = 0; i < layer_kernel; i++)
+        {
+            printf("%d%c", ConvWaiting[i], i < layer_kernel - 1 ? ' ' : '\n');
+        }
         printf("  ConvQueue: ");
         for (int i = 0; i < layer_kernel; i++)
         {
@@ -370,17 +376,23 @@ void dataTransfer()
         DatLatch.push_back(data);*/
         DEB("Start %d => ReqFIFO + DatLatch\n", req->Tag);
     }
+
+
     // ReqFIFI => ConvQueues
     int start_picker_target = picker_tagret; // 记录当前的picker的目标，避免全部一遍后的死循环
+    bool round_picked = false; // 这一整圈有无pick。一圈无pick即使有bandwidth也退出
     while (picker_bandwdith > 0 && ReqQueue.size())
     {
         // 如果卷积核数据数量已经达到了上限，则跳过这个kernel
-        if (ConvQueue[picker_tagret].size() > ConvQueue_MaxSize)
+        if (/*ConvQueue[picker_tagret].size()+*/ConvWaiting[picker_tagret] >= ConvQueue_MaxSize)
         {
             pickNextTarget(); // pick到下一根
-            if (picker_tagret == start_picker_target) // 全部轮询了一遍都不行，取消遍历
-                break;
-            continue;
+            if (picker_tagret == start_picker_target)
+            {
+                if (!round_picked) // 轮询了一整圈都没有pick，退出该循环
+                    break;
+            }
+            continue; // 寻找下一个能pick的卷积核
         }
 
         // 判断有没有能pick到这个卷积核的数据包
@@ -398,6 +410,7 @@ void dataTransfer()
             PickQueue.push_back(packet); // 进入Pick延迟
             packet->kernel_index = picker_tagret;
             packet->resetDelay(Dly_onPick);
+            ConvWaiting[picker_tagret]++; // 等待进入Conv的数量
             DEB("ReqFIFO pick => Conv %d, bandwidth:%d\n", picker_tagret, picker_bandwdith-1);
 
             // 发送后各种数值的变化
@@ -405,13 +418,19 @@ void dataTransfer()
             pickNextTarget();
             has_transfered = true;
             picked = true;
+            round_picked = true;
             break;
         }
-        if (!picked) // 没有能pick到这个卷积核的数据包
+        if (!picked) // 没有能pick到这个卷积核的数据包，手动pick到下一个
             pickNextTarget();
         if (picker_tagret == start_picker_target) // 全部轮询了一遍都不行，取消遍历
-            break;
+        {
+            if (!round_picked) // 轮询了一整圈都没有pick，退出该循环
+                break;
+            round_picked = false;
+        }
     }
+
 
     // Pick延迟结束，进入Conv
     for (int i = 0; i < PickQueue.size(); i++)
@@ -424,6 +443,7 @@ void dataTransfer()
         PickQueue.erase(PickQueue.begin() + i--);
         ConvQueue[packet->kernel_index].push_back(packet);
         packet->resetDelay(Dly_inConv);
+        ConvWaiting[packet->kernel_index]--;
         has_transfered = true;
         DEB("ReqFIFO pick=> Conv %d\n", picker_tagret);
     }

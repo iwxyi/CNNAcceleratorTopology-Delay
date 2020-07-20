@@ -166,7 +166,7 @@ bool judgeConvolutionThreads()
     if (current_layer >= MAX_LAYER)
     {
         // 结果都在上面的的特征图map中。暂时没有输出
-        printf("全部运行结束");
+        printf("all complete\n");
         return true;
     }
 

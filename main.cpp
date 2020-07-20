@@ -13,18 +13,18 @@ int main()
 
 #else
 
-    // ╤ЮоъЁлж╢пп╬М╩Щ©иртй╧сц╢к╥╫╥╗
+    // Е╓ Г╨©Г╗▀Ф┴╖Х║▄Е█╥Г╖╞Е▐╞Д╩╔Д╫©Г■╗Ф╜╓Ф√╧ФЁ∙
     initLayerResource();
 
     while (true)
     {
-        Sleep(1); // ╠эцБж╠╫с©╗кю
+        Sleep(1); // И│©Е┘█Г⌡╢Ф▌╔Е█║Ф╜╩
 
-        // еп╤о╬М╩ЩвсоъЁл
+        // Е┬╓Ф√╜Е█╥Г╖╞Е╜░Г╨©Г╗▀
         if (judgeConvolutionThreads())
         {
-            // р╩╡Ц╬М╩Щ╫АйЬ
-            if (current_layer >= MAX_LAYER) // Ё╛╧Щ╡Ц╢ниооч
+            // Д╦─Е╠┌Е█╥Г╖╞Г╩⌠Ф²÷
+            if (current_layer >= MAX_LAYER) // Х╤┘Х©┤Е╠┌Ф╛║Д╦┼И≥░
                 break;
         }
     }
