@@ -79,9 +79,9 @@ struct DataPacket
 
 
     // 运行所需
-    const PacketType _packet_type;
-    int delay_step;
-    int delay_max;
+    const PacketType _packet_type = Request;
+    int delay_step = 0;
+    int delay_max = 0;
 
     // 各种标识符
     TagType Tag = 0;
@@ -117,7 +117,6 @@ struct DataPacket
 
     bool isDelayFinished()
     {
-        return true;
         return delay_step >= delay_max;
     }
 };

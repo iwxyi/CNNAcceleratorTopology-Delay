@@ -17,7 +17,10 @@
 #include "layerthread.h"
 #include "delaydefine.h"
 
-#define DEB if (0) printf
+#define DEB if (0) printf // 输出调试过程中的数据流动
+#define PRINT_EVERY true  // 输出每一个位置数据包的数量
+#define DEB_MODE false    // 输出点的更多信息， 速度也会慢很多
+#define STEP_MODE false   // 一步步停下，等待回车
 typedef int ClockType;
 typedef std::vector<DataPacket*> FIFO;
 
@@ -51,7 +54,9 @@ FIFO Switch2NextLayer;
 // ==================== 图像操作 ===================
 FeatureMap* feature_map = NULL; // 当前特征图
 std::vector<Kernel*> kernels;   // 卷积核数组
+#ifdef Q_OS_WIN
 HANDLE HOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+#endif
 
 
 // ==================== 特征图操作 ===================
@@ -125,12 +130,13 @@ void startNewLayer()
     current_layer++;
     layer_channel = getKernelCount(current_layer-1);
     layer_kernel = getKernelCount(current_layer);
-    layer_start_clock = global_clock;
     picker_bandwdith = Picker_FullBandwidth;
     picker_tagret = 0;
     total_points = 0;
     conved_points = 0;
     printf("\n========== enter layer %d ==========\n", current_layer);
+    printf("previous layer clock used:%d    \n", global_clock - layer_start_clock);
+    layer_start_clock = global_clock;
 
     // 数据分割，一下子就分好了，没有延迟
     Kernel* kernel = new Kernel(KERNEL_SIDE, getKernelCount(current_layer-1));
@@ -195,8 +201,11 @@ void printState()
 {
 #ifdef Q_OS_WIN
     // 实测跑第一层（非当前程序），不加清屏是90s，加了约8000s
-    // system("cls"); // 非常非常损耗性能，会降低近百倍速度
-    SetConsoleCursorPosition(HOutput, COORD{0,0}); // 这句话改变光标输出位置，不是清屏
+    if (STEP_MODE)
+        ;
+    else
+        // system("cls"); // 非常非常损耗性能，会降低近百倍速度
+        SetConsoleCursorPosition(HOutput, COORD{0,0}); // 这句话改变光标输出位置，不是清屏
 #else
     // system("clear"); // 非常非常损耗性能，会降低近百倍速度
     printf("\033c"); // 这句清屏命令不吃性能
@@ -207,53 +216,72 @@ void printState()
     printf("    feature map: %d * %d * %d\n", current_map_side, current_map_side, layer_channel);
     printf("    conv kernel: %d * %d * %d, count = %d\n", KERNEL_SIDE, KERNEL_SIDE, layer_channel, layer_kernel);
 
-    return ;
-    int sum = conved_points;
-    int start_points = 0;
-    for (int i = 0; i < StartQueue.size(); i++)
-        start_points += StartQueue.at(i)->points.size();
-    printf("  Start: %d(%d)\n", StartQueue.size(), start_points);
-    int req_points = 0;
-    for (int i = 0; i < ReqQueue.size(); i++)
-        req_points += ReqQueue.at(i)->points.size();
-    printf("  ReqQueue: %d(%d)\n", ReqQueue.size(), req_points);
-    int pick_points = 0;
-    for (int i = 0; i < PickQueue.size(); i++)
-        pick_points += PickQueue.at(i)->points.size();
-    printf("  PickQueue: %d(%d)\n", PickQueue.size(), pick_points);
-    printf("  ConvQueue: ");
-    int conv_points = 0;
-    for (int i = 0; i < layer_kernel; i++)
+    if (PRINT_EVERY)
     {
-        FIFO& queue = ConvQueue[i];
-        int kernel_points = 0;
-        for (int i = 0; i < queue.size(); i++)
+        printf("  Start: %d\n", StartQueue.size());
+        printf("  ReqQueue: %d    \n", ReqQueue.size());
+        printf("  PickQueue: %d    \n", PickQueue.size());
+        printf("  ConvQueue: ");
+        for (int i = 0; i < layer_kernel; i++)
         {
-//            printf("*"); // 用来刷新缓冲区
-            kernel_points += queue.at(i)->points.size();
+            FIFO& queue = ConvQueue[i];
+            printf("%d%c", queue.size(), i < layer_kernel - 1 ? ' ' : '\n');
         }
-        printf("%d(%d)%c", queue.size(), kernel_points, i < layer_kernel - 1 ? ' ' : '\n');
-        conv_points += kernel_points;
+        printf("  Conv2SndFIFO: %d    \n", Conv2SndFIFO.size());
+        printf("  SndQueue: %d    \n", SndQueue.size());
+        printf("  Snd2SwitchFIFO: %d    \n", Snd2SwitchFIFO.size());
+        printf("  SwitchQueue: %d    \n", SwitchQueue.size());
+        printf("  Switch2NextLayer: %d    \n", Switch2NextLayer.size());
     }
-    int conv2snd_points = 0;
-    for (int i = 0; i < Conv2SndFIFO.size(); i++)
-        conv2snd_points += Conv2SndFIFO.at(i)->points.size();
-    printf("  Conv2SndFIFO: %d(%d)\n", Conv2SndFIFO.size(), conv2snd_points);
-    int snd_points = 0;
-    for (int i = 0; i < SndQueue.size(); i++)
-        snd_points += SndQueue.at(i)->points.size();
-    printf("  SndQueue: %d(%d)\n", SndQueue.size(), snd_points);
-    printf("  Snd2SwitchFIFO: %d\n", Snd2SwitchFIFO.size());
-    printf("  SwitchQueue: %d\n", SwitchQueue.size());
-    printf("  Switch2NextLayer: %d\n", Switch2NextLayer.size());
+    else if (DEB_MODE)
+    {
+        int sum = conved_points;
+        int start_points = 0;
+        for (int i = 0; i < StartQueue.size(); i++)
+            start_points += StartQueue.at(i)->points.size();
+        printf("  Start: %d(%d)\n", StartQueue.size(), start_points);
+        int req_points = 0;
+        for (int i = 0; i < ReqQueue.size(); i++)
+            req_points += ReqQueue.at(i)->points.size();
+        printf("  ReqQueue: %d(%d)\n", ReqQueue.size(), req_points);
+        int pick_points = 0;
+        for (int i = 0; i < PickQueue.size(); i++)
+            pick_points += PickQueue.at(i)->points.size();
+        printf("  PickQueue: %d(%d)\n", PickQueue.size(), pick_points);
+        printf("  ConvQueue: ");
+        int conv_points = 0;
+        for (int i = 0; i < layer_kernel; i++)
+        {
+            FIFO& queue = ConvQueue[i];
+            int kernel_points = 0;
+            for (int i = 0; i < queue.size(); i++)
+            {
+    //            printf("*"); // 用来刷新缓冲区
+                kernel_points += queue.at(i)->points.size();
+            }
+            printf("%d(%d)%c", queue.size(), kernel_points, i < layer_kernel - 1 ? ' ' : '\n');
+            conv_points += kernel_points;
+        }
+        int conv2snd_points = 0;
+        for (int i = 0; i < Conv2SndFIFO.size(); i++)
+            conv2snd_points += Conv2SndFIFO.at(i)->points.size();
+        printf("  Conv2SndFIFO: %d(%d)\n", Conv2SndFIFO.size(), conv2snd_points);
+        int snd_points = 0;
+        for (int i = 0; i < SndQueue.size(); i++)
+            snd_points += SndQueue.at(i)->points.size();
+        printf("  SndQueue: %d(%d)\n", SndQueue.size(), snd_points);
+        printf("  Snd2SwitchFIFO: %d\n", Snd2SwitchFIFO.size());
+        printf("  SwitchQueue: %d\n", SwitchQueue.size());
+        printf("  Switch2NextLayer: %d\n", Switch2NextLayer.size());
 
-    sum += start_points
-            + req_points
-            + pick_points
-            + conv_points
-            + conv2snd_points
-            + snd_points;
-    printf("sum: %d\n", sum);
+        sum += start_points
+                + req_points
+                + pick_points
+                + conv_points
+                + conv2snd_points
+                + snd_points;
+        printf("sum: %d\n", sum);
+    }
 }
 
 // ==================== 流程控制 ===================
@@ -280,6 +308,8 @@ void runFlowControl()
     while (true)
     {
         inClock();
+        if (STEP_MODE)
+            getchar();
 
         // 如果超过了最后一层，则退出
         if (current_layer >= MAX_LAYER && feature_map)
@@ -308,7 +338,7 @@ void inClock()
 
     dataTransfer();
 
-//    clockGoesBy();
+    clockGoesBy();
 
     printState();
 }
@@ -616,6 +646,7 @@ void finishFlowControl()
 {
     clock_t end = (clock() - start_time)/CLOCKS_PER_SEC;
     printf("use time: %d s\n", end);
+    getchar();
 }
 
 
