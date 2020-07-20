@@ -18,7 +18,8 @@
 #include "delaydefine.h"
 
 #define DEB if (0) printf // 输出调试过程中的数据流动
-#define PRINT_EVERY true  // 输出每一个位置数据包的数量
+#define PRINT_STATE false // 输出当前layer、clock等信息
+#define PRINT_POINT true  // 输出每一个位置数据包的数量
 #define DEB_MODE false    // 输出点的更多信息， 速度也会慢很多
 #define STEP_MODE false   // 一步步停下，等待回车
 typedef int ClockType;
@@ -200,6 +201,8 @@ void generalNextLayerMap()
  */
 void printState()
 {
+    if (!PRINT_STATE)
+        return ;
 #ifdef Q_OS_WIN
     // 实测跑第一层（非当前程序），不加清屏是90s，加了约8000s
     if (STEP_MODE)
@@ -217,7 +220,7 @@ void printState()
     printf("    feature map: %d * %d * %d\n", current_map_side, current_map_side, layer_channel);
     printf("    conv kernel: %d * %d * %d, count = %d\n", KERNEL_SIDE, KERNEL_SIDE, layer_channel, layer_kernel);
 
-    if (PRINT_EVERY)
+    if (PRINT_POINT)
     {
         printf("  Start       : %d\n", StartQueue.size());
         printf("  ReqFIFI     : %d    \n", ReqQueue.size());
