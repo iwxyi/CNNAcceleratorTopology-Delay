@@ -38,7 +38,8 @@ int picker_tagret = 0; // picker下一次pick的目标，0~layer_kernel-1。如�
 int switch_bandwidth = Switch_FullBandwidth; // switch发送的最大速度
 int current_map_side = 0; // 当前图像的大小
 long long total_points = 0; // 总共参与卷积的点
-long long finished_points = 0; // 已经卷积并且结束的点。如果两者相等，则表示当前层已经结束了
+long long conved_points = 0; // 已经卷积并且结束的点。如果两者相等，则表示当前层已经结束了
+long long next_layer_points = 0; // 下一层应该有的点的数量
 
 // ==================== 各种队列 ===================
 FIFO StartQueue; // 特征图的每一点生成后并传输到ReqQueue的队列
@@ -90,9 +91,10 @@ void splitMap2Queue(FeatureMap* map, Kernel* kernel, FIFO& queue)
     }
 
     current_map_side = map->side;
-    finished_points = 0;
+    conved_points = 0;
+    total_points = side * side * map->channel;
     // 预备要生成的点的数量
-    total_points = (map->side - kernel->side + 1) * (map->side - kernel->side + 1) * 1;
+    next_layer_points = (map->side - kernel->side + 1) * (map->side - kernel->side + 1) * 1;
 
     // 将每个点打包成能够发送的数据包
     // 存储在预备发送的队列中
@@ -140,7 +142,7 @@ void startNewLayer()
     picker_bandwdith = Picker_FullBandwidth;
     picker_tagret = 0;
     total_points = 0;
-    finished_points = 0;
+    conved_points = 0;
     printf("\n========== enter layer %d ==========\n", current_layer);
 
     // 数据分割，一下子就分好了，没有延迟
@@ -226,8 +228,8 @@ void printState()
     printf("\033c"); // 这句清屏命令不吃性能
 #endif
     printf("current clock: %d                                  \n", global_clock);
-    printf("current layer: %d    %lld / %lld (%.4f%%)           \n", current_layer, finished_points, total_points,
-           total_points == 0 ? 100 : finished_points*100.0/total_points);
+    printf("current layer: %d    %lld / %lld (%.4f%%)           \n", current_layer, conved_points, total_points,
+           total_points == 0 ? 100 : conved_points*100.0/total_points);
     printf("    feature map: %d * %d * %d\n", current_map_side, current_map_side, layer_channel);
     printf("    conv kernel: %d * %d * %d, count = %d\n", KERNEL_SIDE, KERNEL_SIDE, layer_channel, layer_kernel);
 
@@ -259,7 +261,7 @@ void printState()
     // 不过这样显示会大幅度拖慢速度
     else if (DEB_MODE)
     {
-        int sum = finished_points;
+        int sum = conved_points;
         int start_points = 0;
         for (int i = 0; i < StartQueue.size(); i++)
             start_points += StartQueue.at(i)->points.size();
@@ -526,6 +528,7 @@ void dataTransfer()
 
         PointVec points = packet->points;
         SndQueue.erase(SndQueue.begin() + i--);
+        conved_points += points.size(); // 卷积完成的点的数量
 
         /**
           * 假装这里packet执行 3*3*kernel 相乘操作
@@ -597,14 +600,13 @@ void dataTransfer()
         if (!packet->isDelayFinished())
             continue;
 
-        finished_points++; // 完成的点的数量
         Switch2NextLayer.erase(Switch2NextLayer.begin() + i--);
         NextLayerFIFO.push_back(packet);
         has_transfered = true;
     }
 
 
-    if (NextLayerFIFO.size() == total_points)
+    if (NextLayerFIFO.size() == next_layer_points)
     {
         // 这一层完成，且全部传递完成
         generalNextLayerMap();
