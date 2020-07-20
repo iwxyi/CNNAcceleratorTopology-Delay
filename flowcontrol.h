@@ -128,8 +128,10 @@ void splitMap2Queue(FeatureMap* map, Kernel* kernel, FIFO& queue)
  */
 void startNewLayer()
 {
+    printf("previous layer clock used:%d    \n", global_clock - layer_start_clock);
     // 这里是一层的开始
     current_layer++;
+    layer_start_clock = global_clock;
     layer_channel = getKernelCount(current_layer-1);
     layer_kernel = getKernelCount(current_layer);
     picker_bandwdith = Picker_FullBandwidth;
@@ -137,8 +139,6 @@ void startNewLayer()
     total_points = 0;
     conved_points = 0;
     printf("\n========== enter layer %d ==========\n", current_layer);
-    printf("previous layer clock used:%d    \n", global_clock - layer_start_clock);
-    layer_start_clock = global_clock;
 
     // 数据分割，一下子就分好了，没有延迟
     Kernel* kernel = new Kernel(KERNEL_SIDE, getKernelCount(current_layer-1));
@@ -671,7 +671,7 @@ void clockGoesBy()
 void finishFlowControl()
 {
     clock_t end = (clock() - start_time)/CLOCKS_PER_SEC;
-    printf("use time: %d s\n", end);
+    printf("total clock: %d, use time: %d s\n", global_clock, end);
     getchar();
 }
 
