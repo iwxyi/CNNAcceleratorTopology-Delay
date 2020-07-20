@@ -4,8 +4,8 @@
 
 /**
   * TODO:
-  * - 小方块中很多点重复为3次？
-  * - 小方面每个点都要分成8(kernel)份，创建时分还是pick时分？
+  * - tag直接序号吧
+  * - switch的bandwidth
   */
 
 #ifndef FLOWCONTR_H
@@ -18,7 +18,7 @@
 #include "delaydefine.h"
 
 #define DEB if (0) printf // 输出调试过程中的数据流动
-#define PRINT_STATE false // 输出当前layer、clock等信息
+#define PRINT_STATE true  // 输出当前layer、clock等信息
 #define PRINT_POINT true  // 输出每一个位置数据包的数量
 #define DEB_MODE false    // 输出点的更多信息， 速度也会慢很多
 #define STEP_MODE false   // 一步步停下，等待回车
@@ -35,9 +35,10 @@ clock_t start_time;
 bool has_transfered = false;
 int picker_bandwdith = Picker_FullBandwidth; // pick的最大bandwidth
 int picker_tagret = 0; // picker下一次pick的目标，0~layer_kernel-1。如果不行，则跳过
+int switch_bandwidth = Switch_FullBandwidth; // switch发送的最大速度
 int current_map_side = 0; // 当前图像的大小
 long long total_points = 0; // 总共参与卷积的点
-long long conved_points = 0; // 已经卷积并且结束的点。如果两者相等，则表示当前层已经结束了
+long long finished_points = 0; // 已经卷积并且结束的点。如果两者相等，则表示当前层已经结束了
 
 // ==================== 各种队列 ===================
 FIFO StartQueue; // 特征图的每一点生成后并传输到ReqQueue的队列
@@ -49,9 +50,10 @@ FIFO ConvQueue[KERNEL_MAX_COUNT]; // 每个卷积结果队列
 int ConvWaiting[KERNEL_MAX_COUNT]; // 等待pick到卷积队列的数量
 FIFO Conv2SndFIFO; // Conv => SndFIFO
 FIFO SndQueue;   // 合并后的数据队列，发送到下一层
-FIFO Snd2SwitchFIFO;
+FIFO SndPipe;    // 下一层的发送管道
 FIFO SwitchQueue;
 FIFO Switch2NextLayer;
+FIFO NextLayerFIFO;
 
 // ==================== 图像操作 ===================
 FeatureMap* feature_map = NULL; // 当前特征图
@@ -88,8 +90,9 @@ void splitMap2Queue(FeatureMap* map, Kernel* kernel, FIFO& queue)
     }
 
     current_map_side = map->side;
-    conved_points = 0;
-    total_points = points.size(); // 全部要处理的点的数量
+    finished_points = 0;
+    // 预备要生成的点的数量
+    total_points = (map->side - kernel->side + 1) * (map->side - kernel->side + 1) * 1;
 
     // 将每个点打包成能够发送的数据包
     // 存储在预备发送的队列中
@@ -137,7 +140,7 @@ void startNewLayer()
     picker_bandwdith = Picker_FullBandwidth;
     picker_tagret = 0;
     total_points = 0;
-    conved_points = 0;
+    finished_points = 0;
     printf("\n========== enter layer %d ==========\n", current_layer);
 
     // 数据分割，一下子就分好了，没有延迟
@@ -194,6 +197,14 @@ void generalNextLayerMap()
     int channel = layer_kernel;
     int side = current_map_side - KERNEL_SIDE + 1;
     feature_map = new FeatureMap(side, channel);
+
+    // 本来应该要获取这个队列里的数据
+    // 这里直接生成新的特征图了
+    while (!NextLayerFIFO.empty())
+    {
+        delete NextLayerFIFO.back();
+        NextLayerFIFO.pop_back();
+    }
 }
 
 /**
@@ -209,42 +220,46 @@ void printState()
         ;
     else
         // system("cls"); // 非常非常损耗性能，会降低近百倍速度
-        SetConsoleCursorPosition(HOutput, COORD{0,0}); // 这句话改变光标输出位置，不是清屏
+        SetConsoleCursorPosition(HOutput, COORD{0,0}); // 这句话改变光标输出位置，不是清屏。每行后面建议多点空格
 #else
     // system("clear"); // 非常非常损耗性能，会降低近百倍速度
     printf("\033c"); // 这句清屏命令不吃性能
 #endif
-    printf("current clock: %d\n", global_clock);
-    printf("current layer: %d    %lld / %lld (%.4f%%)    \n", current_layer, conved_points, total_points,
-           total_points == 0 ? 100 : conved_points*100.0/total_points);
+    printf("current clock: %d                                  \n", global_clock);
+    printf("current layer: %d    %lld / %lld (%.4f%%)           \n", current_layer, finished_points, total_points,
+           total_points == 0 ? 100 : finished_points*100.0/total_points);
     printf("    feature map: %d * %d * %d\n", current_map_side, current_map_side, layer_channel);
     printf("    conv kernel: %d * %d * %d, count = %d\n", KERNEL_SIDE, KERNEL_SIDE, layer_channel, layer_kernel);
 
+    // 输出每一个模块的位置
     if (PRINT_POINT)
     {
-        printf("  Start       : %d\n", StartQueue.size());
-        printf("  ReqFIFI     : %d    \n", ReqQueue.size());
-        printf("  PickFIFO    : %d    \n", PickQueue.size());
-        printf("      picking : ");
+        printf("  Start       : %d       \n", StartQueue.size());
+        printf("  ReqFIFI     : %d       \n", ReqQueue.size());
+        printf("  PickFIFO    : %d       \n", PickQueue.size());
+        /*printf("      picking : ");
         for (int i = 0; i < layer_kernel; i++)
         {
             printf("%d%c", ConvWaiting[i], i < layer_kernel - 1 ? ' ' : '\n');
-        }
+        }*/
         printf("  ConvFIFO    : ");
         for (int i = 0; i < layer_kernel; i++)
         {
             FIFO& queue = ConvQueue[i];
             printf("%d%c", queue.size(), i < layer_kernel - 1 ? ' ' : '\n');
         }
-        printf("  Conv2SndFIFO: %d    \n", Conv2SndFIFO.size());
-        printf("  SndFIFO     : %d    \n", SndQueue.size());
-        printf("  Snd2Switch  : %d    \n", Snd2SwitchFIFO.size());
-        printf("  SwitchFIFO  : %d    \n", SwitchQueue.size());
-        printf("  toNewLayer  : %d    \n", Switch2NextLayer.size());
+        printf("  Conv2SndFIFO: %d      \n", Conv2SndFIFO.size());
+        printf("  SndFIFO     : %d      \n", SndQueue.size());
+        printf("  SndPipe     : %d      \n", SndPipe.size());
+        printf("  SwitchFIFO  : %d      \n", SwitchQueue.size());
+        printf("  toNextLayer : %d      \n", Switch2NextLayer.size());
+        printf("  NextLayer   : %d      \n", NextLayerFIFO.size());
     }
+    // 在调试的时候，输出更多的信息
+    // 不过这样显示会大幅度拖慢速度
     else if (DEB_MODE)
     {
-        int sum = conved_points;
+        int sum = finished_points;
         int start_points = 0;
         for (int i = 0; i < StartQueue.size(); i++)
             start_points += StartQueue.at(i)->points.size();
@@ -279,9 +294,10 @@ void printState()
         for (int i = 0; i < SndQueue.size(); i++)
             snd_points += SndQueue.at(i)->points.size();
         printf("  SndQueue: %d(%d)\n", SndQueue.size(), snd_points);
-        printf("  Snd2SwitchFIFO: %d\n", Snd2SwitchFIFO.size());
+        printf("  SndQueue: %d(%d)\n", SndQueue.size(), snd_points);
         printf("  SwitchQueue: %d\n", SwitchQueue.size());
         printf("  Switch2NextLayer: %d\n", Switch2NextLayer.size());
+        printf("  Switch2NextLayer: %d\n", NextLayerFIFO.size());
 
         sum += start_points
                 + req_points
@@ -295,9 +311,9 @@ void printState()
 
 // ==================== 流程控制 ===================
 // 函数前置声明
-void inClock();
-void dataTransfer();
-void clockGoesBy();
+void inClock();      // 上升沿
+void dataTransfer(); // 数据传输
+void clockGoesBy();  // 下降沿
 
 /**
  * 初始化一切所需要的内容
@@ -335,6 +351,7 @@ void inClock()
 
     global_clock++;
     picker_bandwdith = Picker_FullBandwidth; // bandwidth满载
+    switch_bandwidth = Switch_FullBandwidth;
 
     // 开启新的一层，分割特征图
     if (feature_map)
@@ -436,12 +453,18 @@ void dataTransfer()
     }
 
 
-    // Pick延迟结束，进入Conv
+    // Pick延迟结束，准备进入Conv
     for (int i = 0; i < PickQueue.size(); i++)
     {
         DataPacket* packet = PickQueue.at(i);
         if (!packet->isDelayFinished())
             break;
+
+        /**
+          * 这里假装获取一下weight
+          * 但是由于不进行计算
+          * 故以delay进行设置，而非计算
+          */
 
         // pick延迟结束，进入conv
         PickQueue.erase(PickQueue.begin() + i--);
@@ -459,7 +482,7 @@ void dataTransfer()
     { }*/
 
 
-    // 每个 ConvQueue 将结果发送给 SndFIFO
+    // 每个 ConvQueue
     for (int i = 0; i < layer_kernel; i++)
     {
         FIFO& queue = ConvQueue[i];
@@ -478,6 +501,7 @@ void dataTransfer()
         }
     }
 
+
     // Conv => SndFIFO 的延迟
     for (int i = 0; i < Conv2SndFIFO.size(); i++)
     {
@@ -492,52 +516,68 @@ void dataTransfer()
         has_transfered = true;
     }
 
-    // SndFIFO 传送到 switch
+
+    // SndFIFO
     for (int i = 0; i < SndQueue.size(); i++)
     {
         DataPacket* packet = SndQueue.at(i);
         if (!packet->isDelayFinished())
             break;
 
-        conved_points += packet->points.size(); // 完成的点的数量
+        PointVec points = packet->points;
         SndQueue.erase(SndQueue.begin() + i--);
-        delete packet;
 
-        /*SndQueue.erase(SndQueue.begin() + i--);
-        Snd2SwitchFIFO.push_back(packet);
-        packet->resetDelay(Dly_Snd2Switch);
-        DEB("SndFIFO => Switch\n");*/
+        /**
+          * 假装这里packet执行 3*3*kernel 相乘操作
+          * 例如224*224*3，生成222*222*3
+          * 即 y>=3 且 x>=3 才能够计算，得出新的点
+          */
+
+        // 生成的点进入SndPipe
+        for (int i = 0; i < points.size(); i++)
+        {
+            const PointBean point = points.at(i);
+            // x>=3 且 y>=3 的点，可以用来生成新的坐标
+            if (point.x < KERNEL_SIDE-1 || point.y < KERNEL_SIDE-1 || point.z != layer_channel-1)
+                continue;
+
+            TagType tag = (point.z << 16) + (point.y << 8) + point.x;
+            DataPacket* resultPacket = new DataPacket(tag, (INT8)point.z, (INT8)point.y, (INT8)point.x);
+            resultPacket->resetDelay(Dly_SndPipe);
+            SndPipe.push_back(resultPacket);
+        }
+
+        delete packet;
         DEB("SndFIFO calculated\n");
         has_transfered = true;
     }
 
-    // 全部卷积完毕
-    if (total_points > 0 && conved_points >= total_points)
-    {
-        conved_points = total_points = 0;
-        DEB("convolution all completed\n");
-        DataPacket* packet = new DataPacket(Request);
-        Snd2SwitchFIFO.push_back(packet);
-        packet->resetDelay(Dly_Snd2Switch);
-    }
+    // -------------------- 层分割线 -------------------
 
-    // SndFIFO => Switch 中途的总延迟
-    for (int i = 0; i < Snd2SwitchFIFO.size(); i++)
+
+    // SndPipe存储的就是全部的结果了
+    // SndPipe (SndFIFO => Switch)
+    for (int i = 0; i < SndPipe.size(); i++)
     {
-        DataPacket* packet = Snd2SwitchFIFO.at(i);
+        DataPacket* packet = SndPipe.at(i);
         if (!packet->isDelayFinished())
             break;
 
-        Snd2SwitchFIFO.erase(Snd2SwitchFIFO.begin() + i--);
+        SndPipe.erase(SndPipe.begin() + i--);
         SwitchQueue.push_back(packet);
         packet->resetDelay(Dly_inSwitch);
         DEB("SndFIFO => Switch delay\n");
         has_transfered = true;
     }
 
+
+    // -------------------- Switch分割线 --------------------
+
     // Switch发送至下一层
     for (int i = 0; i < SwitchQueue.size(); i++)
     {
+        if (switch_bandwidth <= 0)
+            break;
         DataPacket* packet = SwitchQueue.at(i);
         if (!packet->isDelayFinished())
             break;
@@ -547,29 +587,28 @@ void dataTransfer()
         packet->resetDelay(Dly_Switch2NextPE);
         DEB("Switch => NextLayer\n");
         has_transfered = true;
+        switch_bandwidth--; // switch发送也要bandwidth
     }
 
-    if (Switch2NextLayer.size())
-    {
-        DataPacket* packet = Switch2NextLayer.front();
-        if (packet->isDelayFinished())
-        {
-            Switch2NextLayer.clear();
-            delete packet;
-            generalNextLayerMap();
-        }
-    }
-    /*for (int i = 0; i < Switch2NextLayer.size(); i++)
+
+    for (int i = 0; i < Switch2NextLayer.size(); i++)
     {
         DataPacket* packet = Switch2NextLayer.at(i);
         if (!packet->isDelayFinished())
             continue;
 
+        finished_points++; // 完成的点的数量
         Switch2NextLayer.erase(Switch2NextLayer.begin() + i--);
-        conved_points += packet->points.size(); // 完成的点的数量
-        delete packet; // 避免内存泄漏
+        NextLayerFIFO.push_back(packet);
         has_transfered = true;
-    }*/
+    }
+
+
+    if (NextLayerFIFO.size() == total_points)
+    {
+        // 这一层完成，且全部传递完成
+        generalNextLayerMap();
+    }
 
 
     // 如果这个函数中有数据传输
@@ -639,11 +678,11 @@ void clockGoesBy()
         }
     }
 
-    if (Dly_Snd2Switch)
+    if (Dly_SndPipe)
     {
-        for (unsigned int i = 0; i < Snd2SwitchFIFO.size(); i++)
+        for (unsigned int i = 0; i < SndPipe.size(); i++)
         {
-            Snd2SwitchFIFO[i]->delayToNext();
+            SndPipe[i]->delayToNext();
         }
     }
 
