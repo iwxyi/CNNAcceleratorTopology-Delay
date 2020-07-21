@@ -19,9 +19,10 @@
 
 #define DEB if (0) printf // 输出调试过程中的数据流动
 #define PRINT_STATE true  // 输出当前layer、clock等信息
-#define PRINT_POINT true  // 输出每一个位置数据包的数量
+#define PRINT_MODULE true // 输出每一个模块中数据包的数量
 #define DEB_MODE false    // 输出点的更多信息， 速度也会慢很多
 #define STEP_MODE false   // 一步步停下，等待回车
+
 typedef int ClockType;
 typedef std::vector<DataPacket*> FIFO;
 
@@ -36,6 +37,7 @@ bool has_transfered = false;
 int picker_bandwdith = Picker_FullBandwidth; // pick的最大bandwidth
 int picker_tagret = 0; // picker下一次pick的目标，0~layer_kernel-1。如果不行，则跳过
 int switch_bandwidth = Switch_FullBandwidth; // switch发送的最大速度
+
 int current_map_side = 0; // 当前图像的大小
 long long total_points = 0; // 总共参与卷积的点
 long long conved_points = 0; // 已经卷积并且结束的点。如果两者相等，则表示当前层已经结束了
@@ -114,6 +116,10 @@ void splitMap2Queue(FeatureMap* map, Kernel* kernel, FIFO& queue)
         }
 
         // 将点打包成数据包
+        // ImgID: 全部运行时唯一
+        // CubeID: 小方块的ID
+        // SubID: 小方块第几面
+        // 其实感觉还少了更深一层的ID，但是这个ID也无所谓的，只要有了就行
         DataPacket* packet = new DataPacket(m[y][x][z]);
         packet->ImgID = (INT8)z;
         packet->CubeID = (INT8)y;
@@ -133,7 +139,7 @@ void splitMap2Queue(FeatureMap* map, Kernel* kernel, FIFO& queue)
  */
 void startNewLayer()
 {
-    printf("previous layer clock used:%d    \n", global_clock - layer_start_clock);
+    printf("\nprevious layer clock used:%d    \n", global_clock - layer_start_clock);
     // 这里是一层的开始
     current_layer++;
     layer_start_clock = global_clock;
@@ -143,7 +149,7 @@ void startNewLayer()
     picker_tagret = 0;
     total_points = 0;
     conved_points = 0;
-    printf("\n========== enter layer %d ==========\n", current_layer);
+    printf("========== enter layer %d ==========\n", current_layer);
 
     // 数据分割，一下子就分好了，没有延迟
     Kernel* kernel = new Kernel(KERNEL_SIDE, getKernelCount(current_layer-1));
@@ -170,7 +176,9 @@ bool findTagInQueue(FIFO queue, TagType tag)
 }
 
 /**
- * 切换至下一个pick的目标
+ * Picker 切换至下一个pick的目标
+ * 目前采用轮询算法，但是其实不管什么调度算法都可以
+ * 只要卷积核有空，堆上去就是了，总量不变，不影响结果
  */
 void pickNextTarget()
 {
@@ -200,7 +208,12 @@ void generalNextLayerMap()
     int side = current_map_side - KERNEL_SIDE + 1;
     feature_map = new FeatureMap(side, channel);
 
-    // 本来应该要获取这个队列里的数据
+    /**
+      * 假装从队列里面获取数据
+      * 根据里面的xyz值，一一放到新特征图的位数据里
+      * 这里不需要真正的数据，直接创建新的特征图
+      */
+
     // 这里直接生成新的特征图了
     while (!NextLayerFIFO.empty())
     {
@@ -211,6 +224,9 @@ void generalNextLayerMap()
 
 /**
  * 输出运行时的状况
+ * PRINT_STATE: 总开关
+ * PRINT_POINT: 输出每个位置有多少数据包
+ * DEB_MODE: 调试模式，输出每个位置有多少点
  */
 void printState()
 {
@@ -234,7 +250,7 @@ void printState()
     printf("    conv kernel: %d * %d * %d, count = %d\n", KERNEL_SIDE, KERNEL_SIDE, layer_channel, layer_kernel);
 
     // 输出每一个模块的位置
-    if (PRINT_POINT)
+    if (PRINT_MODULE)
     {
         printf("  Start       : %d       \n", StartQueue.size());
         printf("  ReqFIFI     : %d       \n", ReqQueue.size());
@@ -328,7 +344,7 @@ void initFlowControl()
 }
 
 /**
- * 每个clock运行一次
+ * 循环，使每个clock运行一次
  */
 void runFlowControl()
 {
@@ -373,7 +389,7 @@ void inClock()
 
 /**
  * 数据传输
- * 如果has_transfered，则重新此方法
+ * 如果has_transfered，则递归调用此方法
  */
 void dataTransfer()
 {
@@ -530,12 +546,6 @@ void dataTransfer()
         SndQueue.erase(SndQueue.begin() + i--);
         conved_points += points.size(); // 卷积完成的点的数量
 
-        /**
-          * 假装这里packet执行 3*3*kernel 相乘操作
-          * 例如224*224*3，生成222*222*3
-          * 即 y>=3 且 x>=3 才能够计算，得出新的点
-          */
-
         // 生成的点进入SndPipe
         for (int i = 0; i < points.size(); i++)
         {
@@ -544,6 +554,14 @@ void dataTransfer()
             if (point.x < KERNEL_SIDE-1 || point.y < KERNEL_SIDE-1 || point.z != layer_channel-1)
                 continue;
 
+            /**
+              * 假装这里packet执行 3*3*kernel 相乘操作
+              * 例如224*224*3，生成222*222*3
+              * 即 y>=3 且 x>=3 才能够计算，得出新的点
+              */
+
+            // 每一个点和前面3*3*kernel-1个点进行运算，得到一个全新的结果点
+            // 结果点要重新编号，规则和之前的一样，而这也是下一层的编号
             TagType tag = (point.z << 16) + (point.y << 8) + point.x;
             DataPacket* resultPacket = new DataPacket(tag, (INT8)point.z, (INT8)point.y, (INT8)point.x);
             resultPacket->resetDelay(Dly_SndPipe);
@@ -594,6 +612,7 @@ void dataTransfer()
     }
 
 
+    // Switch发往下一层的delay
     for (int i = 0; i < Switch2NextLayer.size(); i++)
     {
         DataPacket* packet = Switch2NextLayer.at(i);
@@ -606,9 +625,11 @@ void dataTransfer()
     }
 
 
+    // 传输到下一层的数据包队列，这一层已经不用管了
     if (NextLayerFIFO.size() == next_layer_points)
     {
         // 这一层完成，且全部传递完成
+        // 创建新的feature map，下一个clock会读取，这样就进入了新的一层
         generalNextLayerMap();
     }
 
@@ -626,6 +647,7 @@ void dataTransfer()
 /**
  * 流逝了一个clock
  * 即所有队列中的packet的delay都next
+ * 如果有新加的有延迟的队列，都要放里面
  */
 void clockGoesBy()
 {
