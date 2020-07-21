@@ -610,6 +610,10 @@ void MainWindow::dataTransfer()
             DataPacket* resultPacket = new DataPacket(tag, (INT8)point.z, (INT8)point.y, (INT8)point.x);
             resultPacket->resetDelay(Dly_SndPipe);
             SndPipe.push_back(resultPacket);
+
+            auto view = createPacketView(resultPacket);
+            if (view)
+                view ->setColor(Qt::green);
         }
 
         if (packet->view)
@@ -665,6 +669,11 @@ void MainWindow::dataTransfer()
         if (!packet->isDelayFinished())
             continue;
 
+        if (packet->view)
+        {
+            packet->view->deleteLater();
+            packet->view = nullptr;
+        }
         Switch2NextLayer.erase(Switch2NextLayer.begin() + i--);
         NextLayerFIFO.push_back(packet);
         has_transfered = true;
@@ -847,6 +856,15 @@ void MainWindow::updatePacketPos()
         if (packet->view)
             packet->view->mv(view_pos);
     }
+
+    view_pos = widget_pos + ui->SwitchFIFO_Label->geometry().center();
+    view_pos.setY(view_pos.y() + 20);
+    for (unsigned i = 0; i < Switch2NextLayer.size(); i++)
+    {
+        DataPacket* packet = Switch2NextLayer.at(i);
+        if (packet->view)
+            packet->view->mv(view_pos);
+    }
 }
 
 /**
@@ -865,8 +883,11 @@ void MainWindow::finishFlowControl()
  * 随着数据的流动，每个控件都显示在对应的位置
  * （需要手动修改数据包的位置才可以）
  */
-void MainWindow::createPacketView(DataPacket *packet)
+DataPacketView *MainWindow::createPacketView(DataPacket *packet)
 {
+    if (concurrent_running)
+        return nullptr;
     DataPacketView* view = new DataPacketView(packet, this);
     view->show();
+    return view;
 }

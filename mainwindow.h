@@ -73,7 +73,7 @@ protected:
 
     void finishFlowControl();
 
-    void createPacketView(DataPacket* packet);
+    DataPacketView* createPacketView(DataPacket* packet);
 
 private:
     Ui::MainWindow *ui;

@@ -15,7 +15,7 @@ class DataPacketView : public QWidget
 {
     Q_OBJECT
 public:
-    DataPacketView(DataPacket* packet, QWidget* parent = nullptr) : QWidget(parent), packet(packet), animation_duration(PACKET_ANIMATION_INTERVAL)
+    DataPacketView(DataPacket* packet, QWidget* parent = nullptr) : QWidget(parent), packet(packet), animation_duration(PACKET_ANIMATION_INTERVAL), color(Qt::red)
     {
         Q_ASSERT(packet != nullptr);
         packet->view = this;
@@ -29,6 +29,11 @@ public:
     DataPacket* getPacket()
     {
         return packet;
+    }
+
+    void setColor(QColor c)
+    {
+        color =c;
     }
 
     void setAnimationDuration(int dur)
@@ -45,8 +50,7 @@ protected:
     void paintEvent(QPaintEvent *) override
     {
         QPainter painter(this);
-        QColor c = Qt::red;
-        painter.fillRect(0,0,width(),height(),c);
+        painter.fillRect(0,0,width(),height(),color);
     }
 
 private slots:
@@ -83,6 +87,7 @@ private slots:
 private:
     DataPacket* packet;
     int animation_duration;
+    QColor color;
 };
 
 #endif // PACKETVIEW_H
