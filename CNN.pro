@@ -28,3 +28,9 @@ HEADERS += \
     delaydefine.h \
     flowcontrol.h \
     layerthread.h
+
+FORMS += \
+    mainwindow.ui
+
+RESOURCES += \
+    resources.qrc

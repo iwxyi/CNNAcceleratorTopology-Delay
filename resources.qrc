@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/images">
+        <file alias="128layers">images/128Layers.jpg</file>
+        <file alias="PE">images/PE.jpg</file>
+    </qresource>
+</RCC>
