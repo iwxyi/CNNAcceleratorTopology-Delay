@@ -16,6 +16,8 @@ typedef INT8 PointVal;
 struct PointBean;
 typedef std::vector<PointBean> PointVec;
 
+class DataPacketView;
+
 enum PacketType
 {
     Unknow,
@@ -93,6 +95,7 @@ public:
     DataType data = 0; // 具体存储的data
     int kernel_index = -1; // 准备发送到的kernel索引
     PointVec points; // 包含的点的数据
+    DataPacketView* view = NULL;
 
     // 不用管的属性
     int CmdType = 0;

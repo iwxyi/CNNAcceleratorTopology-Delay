@@ -69,6 +69,8 @@ protected:
 
     void clockGoesBy();
 
+    void updatePacketPos();
+
     void finishFlowControl();
 
     void createPacketView(DataPacket* packet);
@@ -82,7 +84,6 @@ private:
     int layer_kernel = 3;    // 当前层的kernel总数量
     int finished_kernel = 0; // 当前层结束的kernel数量
     std::vector<pthread_t*> conv_thread;   // 子线程对象
-    std::vector<FeatureMap*> feature_maps; // 每张图
 
     // 从一开始到现在经过的clock
     ClockType global_clock = 0;
@@ -102,17 +103,17 @@ private:
     long long next_layer_points = 0; // 下一层应该有的点的数量
 
     // ==================== 各种队列 ===================
-    FIFO StartQueue; // 特征图的每一点生成后并传输到ReqQueue的队列
-    FIFO ReqQueue;   // 特征图的每一点req的队列；tag和data相同
+    FIFO StartFIFO; // 特征图的每一点生成后并传输到ReqQueue的队列
+    FIFO ReqFIFO;   // 特征图的每一点req的队列；tag和data相同
     //FIFO DatLatch;   // 特征图的每一点data的队列；tag和req相同
-    FIFO PickQueue; // pick后进行delay的队列
+    FIFO PickFIFO; // pick后进行delay的队列
     //PointVec ConvPoints[KERNEL_MAX_COUNT]; // 卷积数据等待队列
-    FIFO ConvQueue[KERNEL_MAX_COUNT]; // 每个卷积结果队列
-    int ConvWaiting[KERNEL_MAX_COUNT]; // 等待pick到卷积队列的数量
+    FIFO ConvFIFOs[KERNEL_MAX_COUNT]; // 每个卷积结果队列
+    int ConvWaitings[KERNEL_MAX_COUNT] = {}; // 等待pick到卷积队列的数量
     FIFO Conv2SndFIFO; // Conv => SndFIFO
-    FIFO SndQueue;   // 合并后的数据队列，发送到下一层
+    FIFO SndFIFO;   // 合并后的数据队列，发送到下一层
     FIFO SndPipe;    // 下一层的发送管道
-    FIFO SwitchQueue;
+    FIFO SwitchFIFO;
     FIFO Switch2NextLayer;
     FIFO NextLayerFIFO;
 

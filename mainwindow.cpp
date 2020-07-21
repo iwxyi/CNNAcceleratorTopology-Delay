@@ -9,7 +9,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     runtimer = new QTimer(this);
     runtimer->setSingleShot(false);
-    runtimer->setInterval(300);
+    runtimer->setInterval(500);
     runtimer->stop();
     connect(runtimer, SIGNAL(timeout()), this, SLOT(onTimerTimeOut()));
 
@@ -81,6 +81,7 @@ void MainWindow::onTimerTimeOut()
     }
 
     inClock();
+    updatePacketPos();
 }
 
 /**
@@ -93,7 +94,6 @@ void MainWindow::initLayerResource()
     layer_channel = 3;
     layer_kernel = 3;
     finished_kernel = 3; // 第0层的kernel数=第1层的channel=3
-    feature_maps.push_back(new FeatureMap(0, MAP_SIDE_MAX, MAP_CHANNEL_DEFULT)); // 默认224*224*3的图
 }
 
 /**
@@ -202,7 +202,7 @@ void MainWindow::startNewLayer()
 
     // 数据分割，一下子就分好了，没有延迟
     Kernel* kernel = new Kernel(KERNEL_SIDE, getKernelCount(current_layer-1));
-    splitMap2Queue(feature_map, kernel, StartQueue);
+    splitMap2Queue(feature_map, kernel, StartFIFO);
     delete kernel;
     delete feature_map;
     feature_map = NULL;
@@ -301,9 +301,9 @@ void MainWindow::printState()
     // 输出每一个模块的位置
     if (PRINT_MODULE)
     {
-        printf("  Start       : %d       \n", StartQueue.size());
-        printf("  ReqFIFI     : %d       \n", ReqQueue.size());
-        printf("  PickFIFO    : %d       \n", PickQueue.size());
+        printf("  Start       : %d       \n", StartFIFO.size());
+        printf("  ReqFIFI     : %d       \n", ReqFIFO.size());
+        printf("  PickFIFO    : %d       \n", PickFIFO.size());
         /*printf("      picking : ");
             for (int i = 0; i < layer_kernel; i++)
             {
@@ -312,13 +312,13 @@ void MainWindow::printState()
         printf("  ConvFIFO    : ");
         for (int i = 0; i < layer_kernel; i++)
         {
-            FIFO& queue = ConvQueue[i];
+            FIFO& queue = ConvFIFOs[i];
             printf("%d%c", queue.size(), i < layer_kernel - 1 ? ' ' : '\n');
         }
         printf("  Conv2SndFIFO: %d      \n", Conv2SndFIFO.size());
-        printf("  SndFIFO     : %d      \n", SndQueue.size());
+        printf("  SndFIFO     : %d      \n", SndFIFO.size());
         printf("  SndPipe     : %d      \n", SndPipe.size());
-        printf("  SwitchFIFO  : %d      \n", SwitchQueue.size());
+        printf("  SwitchFIFO  : %d      \n", SwitchFIFO.size());
         printf("  toNextLayer : %d      \n", Switch2NextLayer.size());
         printf("  NextLayer   : %d      \n", NextLayerFIFO.size());
     }
@@ -328,22 +328,22 @@ void MainWindow::printState()
     {
         int sum = conved_points;
         int start_points = 0;
-        for (int i = 0; i < StartQueue.size(); i++)
-            start_points += StartQueue.at(i)->points.size();
-        printf("  Start: %d(%d)\n", StartQueue.size(), start_points);
+        for (int i = 0; i < StartFIFO.size(); i++)
+            start_points += StartFIFO.at(i)->points.size();
+        printf("  Start: %d(%d)\n", StartFIFO.size(), start_points);
         int req_points = 0;
-        for (int i = 0; i < ReqQueue.size(); i++)
-            req_points += ReqQueue.at(i)->points.size();
-        printf("  ReqQueue: %d(%d)\n", ReqQueue.size(), req_points);
+        for (int i = 0; i < ReqFIFO.size(); i++)
+            req_points += ReqFIFO.at(i)->points.size();
+        printf("  ReqQueue: %d(%d)\n", ReqFIFO.size(), req_points);
         int pick_points = 0;
-        for (int i = 0; i < PickQueue.size(); i++)
-            pick_points += PickQueue.at(i)->points.size();
-        printf("  PickQueue: %d(%d)\n", PickQueue.size(), pick_points);
+        for (int i = 0; i < PickFIFO.size(); i++)
+            pick_points += PickFIFO.at(i)->points.size();
+        printf("  PickQueue: %d(%d)\n", PickFIFO.size(), pick_points);
         printf("  ConvQueue: ");
         int conv_points = 0;
         for (int i = 0; i < layer_kernel; i++)
         {
-            FIFO& queue = ConvQueue[i];
+            FIFO& queue = ConvFIFOs[i];
             int kernel_points = 0;
             for (int i = 0; i < queue.size(); i++)
             {
@@ -358,11 +358,11 @@ void MainWindow::printState()
             conv2snd_points += Conv2SndFIFO.at(i)->points.size();
         printf("  Conv2SndFIFO: %d(%d)\n", Conv2SndFIFO.size(), conv2snd_points);
         int snd_points = 0;
-        for (int i = 0; i < SndQueue.size(); i++)
-            snd_points += SndQueue.at(i)->points.size();
-        printf("  SndQueue: %d(%d)\n", SndQueue.size(), snd_points);
-        printf("  SndQueue: %d(%d)\n", SndQueue.size(), snd_points);
-        printf("  SwitchQueue: %d\n", SwitchQueue.size());
+        for (int i = 0; i < SndFIFO.size(); i++)
+            snd_points += SndFIFO.at(i)->points.size();
+        printf("  SndQueue: %d(%d)\n", SndFIFO.size(), snd_points);
+        printf("  SndQueue: %d(%d)\n", SndFIFO.size(), snd_points);
+        printf("  SwitchQueue: %d\n", SwitchFIFO.size());
         printf("  Switch2NextLayer: %d\n", Switch2NextLayer.size());
         printf("  Switch2NextLayer: %d\n", NextLayerFIFO.size());
 
@@ -442,14 +442,15 @@ void MainWindow::dataTransfer()
     // 特征图的点到ReqFIFO和DatLatch
     // 由于ReqFIFO在pick后，有指针指向data，data立马跟着出来
     // 两个是连续的，应该可以不用分开，只使用一个队列
-    while (ReqQueue.size() < ReqFIFO_MaxSize && !StartQueue.empty())
+    while (ReqFIFO.size() < ReqFIFO_MaxSize && !StartFIFO.empty())
     {
-        DataPacket* packet = StartQueue.front();
-        StartQueue.erase(StartQueue.begin()); // 删除首元素
+        DataPacket* packet = StartFIFO.front();
+        StartFIFO.erase(StartFIFO.begin()); // 删除首元素
 
         packet->resetDelay(Dly_inReqFIFO);
         DataPacket* req = packet;
-        ReqQueue.push_back(req);
+        createPacketView(req);
+        ReqFIFO.push_back(req);
 
         /*DataPacket* data = new DataPacket(packet->data);
             data->Tag = req->Tag;
@@ -461,10 +462,10 @@ void MainWindow::dataTransfer()
     // ReqFIFI => ConvQueues
     int start_picker_target = picker_tagret; // 记录当前的picker的目标，避免全部一遍后的死循环
     bool round_picked = false; // 这一整圈有无pick。一圈无pick即使有bandwidth也退出
-    while (picker_bandwdith > 0 && ReqQueue.size())
+    while (picker_bandwdith > 0 && ReqFIFO.size())
     {
         // 如果卷积核数据数量已经达到了上限，则跳过这个kernel
-        if (/*ConvQueue[picker_tagret].size()+*/ConvWaiting[picker_tagret] >= ConvFIFO_MaxSize)
+        if (/*ConvQueue[picker_tagret].size()+*/ConvWaitings[picker_tagret] >= ConvFIFO_MaxSize)
         {
             pickNextTarget(); // pick到下一根
             if (picker_tagret == start_picker_target)
@@ -478,20 +479,20 @@ void MainWindow::dataTransfer()
 
         // 判断有没有能pick到这个卷积核的数据包
         bool picked = false;
-        for (int i = 0; i < ReqQueue.size(); i++)
+        for (int i = 0; i < ReqFIFO.size(); i++)
         {
-            DataPacket* packet = ReqQueue.at(i);
+            DataPacket* packet = ReqFIFO.at(i);
             // packet 延迟没有结束
             if (!packet->isDelayFinished())
                 break;
 
             // packet能发送，kernel能接收
             // 开始发送
-            ReqQueue.erase(ReqQueue.begin() + i--);
-            PickQueue.push_back(packet); // 进入Pick延迟
+            ReqFIFO.erase(ReqFIFO.begin() + i--);
+            PickFIFO.push_back(packet); // 进入Pick延迟
             packet->kernel_index = picker_tagret;
             packet->resetDelay(Dly_onPick);
-            ConvWaiting[picker_tagret]++; // 等待进入Conv的数量
+            ConvWaitings[picker_tagret]++; // 等待进入Conv的数量
             DEB("ReqFIFO pick => Conv %d, bandwidth:%d\n", picker_tagret, picker_bandwdith-1);
 
             // 发送后各种数值的变化
@@ -514,9 +515,9 @@ void MainWindow::dataTransfer()
 
 
     // Pick延迟结束，准备进入Conv
-    for (int i = 0; i < PickQueue.size(); i++)
+    for (int i = 0; i < PickFIFO.size(); i++)
     {
-        DataPacket* packet = PickQueue.at(i);
+        DataPacket* packet = PickFIFO.at(i);
         if (!packet->isDelayFinished())
             break;
 
@@ -527,10 +528,10 @@ void MainWindow::dataTransfer()
               */
 
         // pick延迟结束，进入conv
-        PickQueue.erase(PickQueue.begin() + i--);
-        ConvQueue[packet->kernel_index].push_back(packet);
+        PickFIFO.erase(PickFIFO.begin() + i--);
+        ConvFIFOs[packet->kernel_index].push_back(packet);
         packet->resetDelay(Dly_inConv);
-        ConvWaiting[packet->kernel_index]--;
+        ConvWaitings[packet->kernel_index]--;
         has_transfered = true;
         DEB("ReqFIFO pick=> Conv %d\n", picker_tagret);
     }
@@ -545,7 +546,7 @@ void MainWindow::dataTransfer()
     // 每个 ConvQueue
     for (int i = 0; i < layer_kernel; i++)
     {
-        FIFO& queue = ConvQueue[i];
+        FIFO& queue = ConvFIFOs[i];
         for (int j = 0; j < queue.size(); j++)
         {
             DataPacket* packet = queue.at(j);
@@ -570,7 +571,7 @@ void MainWindow::dataTransfer()
             break;
 
         Conv2SndFIFO.erase(Conv2SndFIFO.begin() + i--);
-        SndQueue.push_back(packet);
+        SndFIFO.push_back(packet);
         packet->resetDelay(Dly_inSndFIFO);
         DEB("Conv => SndFIFO delay\n");
         has_transfered = true;
@@ -578,14 +579,15 @@ void MainWindow::dataTransfer()
 
 
     // SndFIFO
-    for (int i = 0; i < SndQueue.size(); i++)
+    // 这里的size会一直都是0，这是正常情况，不用慌
+    for (int i = 0; i < SndFIFO.size(); i++)
     {
-        DataPacket* packet = SndQueue.at(i);
+        DataPacket* packet = SndFIFO.at(i);
         if (!packet->isDelayFinished())
             break;
 
         PointVec points = packet->points;
-        SndQueue.erase(SndQueue.begin() + i--);
+        SndFIFO.erase(SndFIFO.begin() + i--);
         conved_points += points.size(); // 卷积完成的点的数量
 
         // 生成的点进入SndPipe
@@ -610,6 +612,8 @@ void MainWindow::dataTransfer()
             SndPipe.push_back(resultPacket);
         }
 
+        if (packet->view)
+            packet->view->deleteLater();
         delete packet;
         DEB("SndFIFO calculated\n");
         has_transfered = true;
@@ -627,7 +631,7 @@ void MainWindow::dataTransfer()
             break;
 
         SndPipe.erase(SndPipe.begin() + i--);
-        SwitchQueue.push_back(packet);
+        SwitchFIFO.push_back(packet);
         packet->resetDelay(Dly_inSwitch);
         DEB("SndFIFO => Switch delay\n");
         has_transfered = true;
@@ -637,15 +641,15 @@ void MainWindow::dataTransfer()
     // -------------------- Switch分割线 --------------------
 
     // Switch发送至下一层
-    for (int i = 0; i < SwitchQueue.size(); i++)
+    for (int i = 0; i < SwitchFIFO.size(); i++)
     {
         if (switch_bandwidth <= 0)
             break;
-        DataPacket* packet = SwitchQueue.at(i);
+        DataPacket* packet = SwitchFIFO.at(i);
         if (!packet->isDelayFinished())
             break;
 
-        SwitchQueue.erase(SwitchQueue.begin() + i--);
+        SwitchFIFO.erase(SwitchFIFO.begin() + i--);
         Switch2NextLayer.push_back(packet);
         packet->resetDelay(Dly_Switch2NextPE);
         DEB("Switch => NextLayer\n");
@@ -695,25 +699,25 @@ void MainWindow::clockGoesBy()
 {
     if (Dly_Map2RegFIFO && layer_start_clock + Dly_Map2RegFIFO >= global_clock)
     {
-        for (unsigned int i = 0; i < StartQueue.size(); i++)
+        for (unsigned int i = 0; i < StartFIFO.size(); i++)
         {
-            StartQueue[i]->delayToNext();
+            StartFIFO[i]->delayToNext();
         }
     }
 
     if (Dly_inReqFIFO)
     {
-        for (unsigned int i = 0; i < ReqQueue.size(); i++)
+        for (unsigned int i = 0; i < ReqFIFO.size(); i++)
         {
-            ReqQueue[i]->delayToNext();
+            ReqFIFO[i]->delayToNext();
         }
     }
 
     if (Dly_onPick)
     {
-        for (unsigned int i = 0; i < PickQueue.size(); i++)
+        for (unsigned int i = 0; i < PickFIFO.size(); i++)
         {
-            PickQueue[i]->delayToNext();
+            PickFIFO[i]->delayToNext();
         }
     }
 
@@ -721,9 +725,9 @@ void MainWindow::clockGoesBy()
     {
         for (int i = 0; i < layer_kernel; i++)
         {
-            for (unsigned int j = 0; j < ConvQueue[i].size(); j++)
+            for (unsigned int j = 0; j < ConvFIFOs[i].size(); j++)
             {
-                ConvQueue[i].at(j)->delayToNext();
+                ConvFIFOs[i].at(j)->delayToNext();
             }
         }
     }
@@ -738,9 +742,9 @@ void MainWindow::clockGoesBy()
 
     if (Dly_inSndFIFO)
     {
-        for (unsigned int i = 0; i < SndQueue.size(); i++)
+        for (unsigned int i = 0; i < SndFIFO.size(); i++)
         {
-            SndQueue[i]->delayToNext();
+            SndFIFO[i]->delayToNext();
         }
     }
 
@@ -754,9 +758,9 @@ void MainWindow::clockGoesBy()
 
     if (Dly_inSwitch)
     {
-        for (unsigned int i = 0; i < SwitchQueue.size(); i++)
+        for (unsigned int i = 0; i < SwitchFIFO.size(); i++)
         {
-            SwitchQueue[i]->delayToNext();
+            SwitchFIFO[i]->delayToNext();
         }
     }
 
@@ -766,6 +770,82 @@ void MainWindow::clockGoesBy()
         {
             Switch2NextLayer[i]->delayToNext();
         }
+    }
+}
+
+/**
+ * 设置每一个DataPacket的位置
+ */
+void MainWindow::updatePacketPos()
+{
+    QPoint widget_pos(ui->widget->pos().x(), 50);
+
+    QPoint view_pos = widget_pos + ui->RegFIFO_Label->geometry().center();
+    for (unsigned i = 0; i < ReqFIFO.size(); i++)
+    {
+        DataPacket* packet = ReqFIFO.at(i);
+        if (packet->view)
+            packet->view->mv(view_pos);
+    }
+
+    view_pos = widget_pos + ui->RegFIFO_Label->geometry().bottomLeft();
+    view_pos.setX(view_pos.x() + ui->RegFIFO_Label->width()/2);
+    view_pos.setY(view_pos.y()+10);
+    for (unsigned i = 0; i < PickFIFO.size(); i++)
+    {
+        DataPacket* packet = PickFIFO.at(i);
+        if (packet->view)
+            packet->view->mv(view_pos);
+    }
+
+    view_pos = widget_pos + ui->Convs_Label->geometry().topLeft();
+    view_pos.setY(view_pos.y() + ui->Convs_Label->height()/2);
+    for (int k = 0; k < layer_kernel; k++)
+    {
+        FIFO& queue = ConvFIFOs[k];
+        QPoint pos(view_pos.x() + ui->Convs_Label->width() * k / layer_kernel, view_pos.y());
+        for (unsigned int i = 0; i < queue.size(); i++)
+        {
+            DataPacket* packet = queue.at(i);
+            if (packet->view)
+            {
+                packet->view->mv(pos);
+            }
+        }
+    }
+
+    view_pos = widget_pos + ui->SndFIFO_Label->geometry().center();
+    view_pos.setY(view_pos.y() - ui->SndFIFO_Label->height()/2
+                  - (ui->SndFIFO_Label->pos().y()-ui->Convs_Label->geometry().bottom())/2);
+    for (unsigned i = 0; i < Conv2SndFIFO.size(); i++)
+    {
+        DataPacket* packet = Conv2SndFIFO.at(i);
+        if (packet->view)
+            packet->view->mv(view_pos);
+    }
+
+    view_pos = widget_pos + ui->SndFIFO_Label->geometry().center();
+    for (unsigned i = 0; i < SndFIFO.size(); i++)
+    {
+        DataPacket* packet = SndFIFO.at(i);
+        if (packet->view)
+            packet->view->mv(view_pos);
+    }
+
+    view_pos = widget_pos + ui->SndPipe_Label->geometry().center();
+    for (unsigned i = 0; i < SndPipe.size(); i++)
+    {
+        DataPacket* packet = SndPipe.at(i);
+        if (packet->view)
+            packet->view->mv(view_pos);
+    }
+
+    view_pos = widget_pos + ui->SwitchFIFO_Label->geometry().center();
+    for (unsigned i = 0; i < SwitchFIFO.size(); i++)
+    {
+        DataPacket* packet = SwitchFIFO.at(i);
+        if (packet->view)
+            packet->view->mv(view_pos);
     }
 }
 
@@ -788,4 +868,5 @@ void MainWindow::finishFlowControl()
 void MainWindow::createPacketView(DataPacket *packet)
 {
     DataPacketView* view = new DataPacketView(packet, this);
+    view->show();
 }

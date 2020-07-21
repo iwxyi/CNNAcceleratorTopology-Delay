@@ -455,7 +455,6 @@ border-radius:3px;</string>
     <bool>false</bool>
    </attribute>
    <addaction name="actionRun"/>
-   <addaction name="actionRun_Extremly"/>
   </widget>
   <action name="actionRun">
    <property name="text">

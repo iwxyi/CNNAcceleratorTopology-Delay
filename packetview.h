@@ -18,6 +18,7 @@ public:
     DataPacketView(DataPacket* packet, QWidget* parent = nullptr) : QWidget(parent), packet(packet), animation_duration(PACKET_ANIMATION_INTERVAL)
     {
         Q_ASSERT(packet != nullptr);
+        packet->view = this;
         connect(packet, SIGNAL(signalPosChanged(QPoint, QPoint)), this, SLOT(updatePosition(QPoint, QPoint)));
         connect(packet, SIGNAL(signalContentChanged()), this, SLOT(updateToolTip()));
         connect(packet, SIGNAL(signalDeleted()), this, SLOT(deleteLater()));
@@ -35,15 +36,16 @@ public:
         this->animation_duration = dur;
     }
 
+    void mv(QPoint pos)
+    {
+        updatePosition(this->pos(), pos);
+    }
+
 protected:
     void paintEvent(QPaintEvent *) override
     {
         QPainter painter(this);
         QColor c = Qt::red;
-        if (packet != nullptr) // 固定
-        {
-            c = QColor(30, 144, 255);
-        }
         painter.fillRect(0,0,width(),height(),c);
     }
 
@@ -63,7 +65,7 @@ private slots:
         ani->setStartValue(this->pos());
         ani->setEndValue(new_pos - QPoint(PACKET_SIZE / 2, PACKET_SIZE / 2));
         ani->setDuration(animation_duration);
-    //    ani->setEasingCurve(QEasingCurve::InOutCubic);
+        // ani->setEasingCurve(QEasingCurve::InOutCubic);
         ani->start();
     }
 
