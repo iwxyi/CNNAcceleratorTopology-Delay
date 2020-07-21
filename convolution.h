@@ -12,13 +12,6 @@
     #define INT8 char
 #endif
 
-// ==================== 尺寸定义 ===================
-#define MAP_SIDE_MAX 65     // 特征图边长的最大
-#define MAP_CHANNEL_DEFULT 3 // 特征图通道默认数量 RGB
-#define KERNEL_SIDE 3        // 卷积核固定边长
-#define KERNEL_MAX_COUNT 32  // 卷积核最大数量
-#define MAX_LAYER 32         // 最多的层数（32还是128）
-
 
 /**
  * 创建固定大小的三维数组

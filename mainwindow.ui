@@ -227,7 +227,7 @@
        </widget>
       </item>
       <item row="13" column="1">
-       <widget class="QSpinBox" name="ConvFIFO_MaxSIze_Spin">
+       <widget class="QSpinBox" name="ConvsFIFO_MaxSize_Spin">
         <property name="maximum">
          <number>999999</number>
         </property>

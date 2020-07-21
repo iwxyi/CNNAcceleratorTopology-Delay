@@ -79,6 +79,25 @@ private:
     Ui::MainWindow *ui;
     QTimer *runtimer;
 
+    // 各种模块
+    int PacketPointCount = 2;       // 每个req数据包带有几个点的数量
+    int ReqFIFO_MaxSize = 24;       // ReqQueue数据量上限
+    int Picker_FullBandwidth = 256; // 1个clock进行pick的数据数量
+    int ConvFIFO_MaxSize = 9;       // 卷积核存储的数据包最大的大小：?*8B*数量
+    int Switch_FullBandwidth = 200; // Switch传输到下一层的：?*8B
+
+    // 各种delay
+    int Dly_Map2RegFIFO = 1;   // 每个数据到ReqFIFO里面的delay
+    int Dly_inReqFIFO = 0;     // ReqFIFO中的delay
+    int Dly_onPick = 1;        // ReqQueue里每个数据Pick的delay
+    int Dly_inConv = 1;        // 在Conv中的delay
+    int Dly_Conv2SndFIFO = 1;  // 卷积后进入SndFIFO的delay
+    int Dly_inSndFIFO = 1;     // 在SndFIFO的delay
+    int Dly_SndPipe = 1;       // SndFIFO发送到Switch的delay
+    int Dly_inSwitch = 0;      // 在switch中的delay
+    int Dly_Switch2NextPE = 1; // Send至下一层PE的delay
+
+    // 运行数值
     int current_layer = 0;   // 当前正处在第几层
     int layer_channel = 3;   // 当前层图片深度，即channel数量
     int layer_kernel = 3;    // 当前层的kernel总数量

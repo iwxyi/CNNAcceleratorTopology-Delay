@@ -9,11 +9,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
     runtimer = new QTimer(this);
     runtimer->setSingleShot(false);
-    runtimer->setInterval(500);
+    runtimer->setInterval(300);
     runtimer->stop();
     connect(runtimer, SIGNAL(timeout()), this, SLOT(onTimerTimeOut()));
-
-    initFlowControl();
 }
 
 MainWindow::~MainWindow()
@@ -33,6 +31,10 @@ void MainWindow::on_actionRun_triggered()
     }
     if (!runtimer->isActive())
     {
+        if (current_layer == 0)
+        {
+            initFlowControl();
+        }
         runtimer->start();
     }
     else
@@ -91,9 +93,9 @@ void MainWindow::onTimerTimeOut()
 void MainWindow::initLayerResource()
 {
     current_layer = 0;   // 第0层
-    layer_channel = 3;
-    layer_kernel = 3;
-    finished_kernel = 3; // 第0层的kernel数=第1层的channel=3
+    layer_channel = MAP_CHANNEL_DEFULT;
+    layer_kernel = MAP_CHANNEL_DEFULT;
+    finished_kernel = MAP_CHANNEL_DEFULT; // 第0层的kernel数=第1层的channel=3
 }
 
 /**
@@ -384,6 +386,22 @@ void MainWindow::initFlowControl()
     initLayerResource();
     feature_map = new FeatureMap(0, MAP_SIDE_MAX, MAP_CHANNEL_DEFULT);
     start_time = clock();
+
+    Dly_Map2RegFIFO = ui->Dly_Map2RegFIFO_Spin->value();
+    Dly_inReqFIFO = ui->Dly_inReqFIFO_Spin->value();
+    Dly_onPick = ui->Dly_onPick_Spin->value();
+    Dly_inConv = ui->Dly_inConv_Spin->value();
+    Dly_Conv2SndFIFO = ui->Dly_Conv2SndFIFO_Spin->value();
+    Dly_inSndFIFO = ui->Dly_inSndFIFO_Spin->value();
+    Dly_SndPipe = ui->Dly_SndPipe_Spin->value();
+    Dly_inSwitch = ui->Dly_inSwitch_Spin->value();
+    Dly_Switch2NextPE = ui->Dly_Switch2NextPE_Spin->value();
+    
+    PacketPointCount = ui->PacketPointCount_Spin->value();
+    ReqFIFO_MaxSize = ui->ReqFIFO_MaxSize_Spin->value();
+    Picker_FullBandwidth = ui->Picker_FullBandwidth_Spin->value();
+    ConvFIFO_MaxSize = ui->ConvsFIFO_MaxSize_Spin->value();
+    Switch_FullBandwidth = ui->Switch_FullBandwidth_Spin->value();
 }
 
 /**
@@ -888,6 +906,8 @@ DataPacketView *MainWindow::createPacketView(DataPacket *packet)
     if (concurrent_running)
         return nullptr;
     DataPacketView* view = new DataPacketView(packet, this);
+    view->setToolTip(QString("Tag:%1, ImgID:%2, CubeID:%3, SubID: %4")
+                     .arg(packet->Tag).arg(packet->ImgID).arg(packet->CubeID).append(packet->SubID));
     view->show();
     return view;
 }
