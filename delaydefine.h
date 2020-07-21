@@ -3,10 +3,10 @@
 
 // 各种模块
 #define PacketPointCount 2       // 每个req数据包带有几个点的数量
-#define ReqQueue_MaxSize 24      // ReqQueue数据量上限
+#define ReqFIFO_MaxSize 24       // ReqQueue数据量上限
 #define Picker_FullBandwidth 256 // 1个clock进行pick的数据数量
-#define ConvQueue_MaxSize 9      // 卷积核存储的数据包最大的大小：?*8B*数量
-#define Switch_FullBandwidth 200   // Switch传输到下一层的：?*8B
+#define ConvFIFO_MaxSize 9       // 卷积核存储的数据包最大的大小：?*8B*数量
+#define Switch_FullBandwidth 200 // Switch传输到下一层的：?*8B
 
 // 各种delay
 #define Dly_Map2RegFIFO 1   // 每个数据到ReqFIFO里面的delay

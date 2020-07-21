@@ -400,7 +400,7 @@ void dataTransfer()
     // 特征图的点到ReqFIFO和DatLatch
     // 由于ReqFIFO在pick后，有指针指向data，data立马跟着出来
     // 两个是连续的，应该可以不用分开，只使用一个队列
-    while (ReqQueue.size() < ReqQueue_MaxSize && !StartQueue.empty())
+    while (ReqQueue.size() < ReqFIFO_MaxSize && !StartQueue.empty())
     {
         DataPacket* packet = StartQueue.front();
         StartQueue.erase(StartQueue.begin()); // 删除首元素
@@ -422,7 +422,7 @@ void dataTransfer()
     while (picker_bandwdith > 0 && ReqQueue.size())
     {
         // 如果卷积核数据数量已经达到了上限，则跳过这个kernel
-        if (/*ConvQueue[picker_tagret].size()+*/ConvWaiting[picker_tagret] >= ConvQueue_MaxSize)
+        if (/*ConvQueue[picker_tagret].size()+*/ConvWaiting[picker_tagret] >= ConvFIFO_MaxSize)
         {
             pickNextTarget(); // pick到下一根
             if (picker_tagret == start_picker_target)
