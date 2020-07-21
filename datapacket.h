@@ -46,8 +46,10 @@ struct PointBean
  * - Data
  * - ReqADat
  */
-struct DataPacket
+class DataPacket : public QObject
 {
+    Q_OBJECT
+public:
     DataPacket(PacketType type) : _packet_type(type)
     {
 
@@ -119,6 +121,11 @@ struct DataPacket
     {
         return delay_step >= delay_max;
     }
+
+signals:
+    void signalPosChanged(QPoint old_pos, QPoint new_pos);
+    void signalContentChanged();
+    void signalDeleted();
 };
 
 #endif // DATAPACKET_H

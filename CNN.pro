@@ -15,7 +15,9 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
-    main.cpp
+    convolution.cpp \
+    main.cpp \
+    mainwindow.cpp
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
@@ -27,7 +29,9 @@ HEADERS += \
     datapacket.h \
     delaydefine.h \
     flowcontrol.h \
-    layerthread.h
+    layerthread.h \
+    mainwindow.h \
+    packetview.h
 
 FORMS += \
     mainwindow.ui
