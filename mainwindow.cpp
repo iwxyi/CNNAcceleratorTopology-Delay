@@ -21,8 +21,16 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+/**
+ * QTimer 的启动和暂停
+ */
 void MainWindow::on_actionRun_triggered()
 {
+    if (concurrent_running)
+    {
+        qDebug() << "极速运行中，请先停下";
+        return ;
+    }
     if (!runtimer->isActive())
     {
         runtimer->start();
@@ -33,10 +41,40 @@ void MainWindow::on_actionRun_triggered()
     }
 }
 
+/**
+ * 使用死循环极致的运行
+ */
+void MainWindow::on_actionRun_Extremly_triggered()
+{
+    if (concurrent_running)
+    {
+        // 关闭极速运行
+        /* 这里不直接终止子线程
+         * 而是修改信号量，告知某次clock结束后停止运行
+         */
+        concurrent_running = false;
+    }
+    else
+    {
+        // 开启极速运行
+        concurrent_running = true;
+        QtConcurrent::run(this, &MainWindow::runFlowControl);
+        runtimer->start();
+    }
+}
+
 void MainWindow::onTimerTimeOut()
 {
+    // 极速运行，被子线程接管
+    if (concurrent_running)
+    {
+        return ;
+    }
+
+    //  普通运行
     if (current_layer >= MAX_LAYER && feature_map)
     {
+        // 已经完成，全部停下
         runtimer->stop();
         finishFlowControl();
         return ;
@@ -353,7 +391,7 @@ void MainWindow::initFlowControl()
  */
 void MainWindow::runFlowControl()
 {
-    while (true)
+    while (concurrent_running)
     {
         inClock();
         if (STEP_MODE)

@@ -6,6 +6,7 @@
 #include <time.h>
 #include <QTimer>
 #include <QDebug>
+#include <QtConcurrent/QtConcurrent>
 #include "datapacket.h"
 #include "delaydefine.h"
 #include "convolution.h"
@@ -34,6 +35,8 @@ public:
 
 private slots:
     void on_actionRun_triggered();
+    void on_actionRun_Extremly_triggered();
+
     void onTimerTimeOut();
 
 protected:
@@ -85,6 +88,7 @@ private:
     ClockType global_clock = 0;
     int layer_start_clock = 0;
     clock_t start_time;
+    bool concurrent_running = false; // 高并发运行
     // 某一个clock是否有数据流传输，若有则继续重新判断整个传输流程
     // 使用此flag解决单线程机制无法模拟多线程的多数据同步传输问题
     bool has_transfered = false;

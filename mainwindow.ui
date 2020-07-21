@@ -438,6 +438,7 @@ border-radius:3px;</string>
      <string>运行</string>
     </property>
     <addaction name="actionRun"/>
+    <addaction name="actionRun_Extremly"/>
    </widget>
    <addaction name="menu"/>
    <addaction name="menu_2"/>
@@ -454,10 +455,16 @@ border-radius:3px;</string>
     <bool>false</bool>
    </attribute>
    <addaction name="actionRun"/>
+   <addaction name="actionRun_Extremly"/>
   </widget>
   <action name="actionRun">
    <property name="text">
     <string>Run/Pause</string>
+   </property>
+  </action>
+  <action name="actionRun_Extremly">
+   <property name="text">
+    <string>Run Extremly</string>
    </property>
   </action>
  </widget>
