@@ -26,7 +26,7 @@
       <item row="0" column="0">
        <widget class="QLabel" name="label">
         <property name="text">
-         <string>Dly_Map2RegFIFO</string>
+         <string>Dly_Input2RegFIFO</string>
         </property>
        </widget>
       </item>
@@ -128,28 +128,28 @@
       <item row="7" column="0">
        <widget class="QLabel" name="label_8">
         <property name="text">
-         <string>Dly_inSwitch</string>
+         <string>Dly_SwitchInFIFO</string>
         </property>
        </widget>
       </item>
       <item row="7" column="1">
-       <widget class="QSpinBox" name="Dly_inSwitch_Spin"/>
+       <widget class="QSpinBox" name="Dly_SwitchInFIFO_Spin"/>
       </item>
-      <item row="8" column="0">
+      <item row="11" column="0">
        <widget class="QLabel" name="label_9">
         <property name="text">
          <string>Dly_Switch2NextPE</string>
         </property>
        </widget>
       </item>
-      <item row="8" column="1">
+      <item row="11" column="1">
        <widget class="QSpinBox" name="Dly_Switch2NextPE_Spin">
         <property name="value">
          <number>1</number>
         </property>
        </widget>
       </item>
-      <item row="9" column="0">
+      <item row="12" column="0">
        <widget class="QWidget" name="widget_2" native="true">
         <property name="minimumSize">
          <size>
@@ -168,28 +168,28 @@
         </property>
        </widget>
       </item>
-      <item row="10" column="0">
+      <item row="13" column="0">
        <widget class="QLabel" name="label_10">
         <property name="text">
          <string>Packet Point Count</string>
         </property>
        </widget>
       </item>
-      <item row="10" column="1">
+      <item row="13" column="1">
        <widget class="QSpinBox" name="PacketPointCount_Spin">
         <property name="value">
          <number>2</number>
         </property>
        </widget>
       </item>
-      <item row="11" column="0">
+      <item row="14" column="0">
        <widget class="QLabel" name="label_11">
         <property name="text">
          <string>ReqFIFO Max Size</string>
         </property>
        </widget>
       </item>
-      <item row="11" column="1">
+      <item row="14" column="1">
        <widget class="QSpinBox" name="ReqFIFO_MaxSize_Spin">
         <property name="maximum">
          <number>999999</number>
@@ -202,14 +202,14 @@
         </property>
        </widget>
       </item>
-      <item row="12" column="0">
+      <item row="15" column="0">
        <widget class="QLabel" name="label_12">
         <property name="text">
          <string>Picker Full Bandwidth</string>
         </property>
        </widget>
       </item>
-      <item row="12" column="1">
+      <item row="15" column="1">
        <widget class="QSpinBox" name="Picker_FullBandwidth_Spin">
         <property name="maximum">
          <number>999999</number>
@@ -219,14 +219,14 @@
         </property>
        </widget>
       </item>
-      <item row="13" column="0">
+      <item row="16" column="0">
        <widget class="QLabel" name="label_13">
         <property name="text">
          <string>ConvsFIFO Max Size</string>
         </property>
        </widget>
       </item>
-      <item row="13" column="1">
+      <item row="16" column="1">
        <widget class="QSpinBox" name="ConvsFIFO_MaxSize_Spin">
         <property name="maximum">
          <number>999999</number>
@@ -236,14 +236,14 @@
         </property>
        </widget>
       </item>
-      <item row="14" column="0">
+      <item row="17" column="0">
        <widget class="QLabel" name="label_14">
         <property name="text">
          <string>Switch Full Bandwidth</string>
         </property>
        </widget>
       </item>
-      <item row="14" column="1">
+      <item row="17" column="1">
        <widget class="QSpinBox" name="Switch_FullBandwidth_Spin">
         <property name="maximum">
          <number>999999</number>
@@ -252,6 +252,36 @@
          <number>200</number>
         </property>
        </widget>
+      </item>
+      <item row="8" column="0">
+       <widget class="QLabel" name="label_15">
+        <property name="text">
+         <string>Dly_SwitchOutFIFO</string>
+        </property>
+       </widget>
+      </item>
+      <item row="9" column="0">
+       <widget class="QLabel" name="label_16">
+        <property name="text">
+         <string>Dly_SwitchInData</string>
+        </property>
+       </widget>
+      </item>
+      <item row="10" column="0">
+       <widget class="QLabel" name="label_17">
+        <property name="text">
+         <string>Dly_SwitchOutData</string>
+        </property>
+       </widget>
+      </item>
+      <item row="8" column="1">
+       <widget class="QSpinBox" name="Dly_SwitchOutFIFO_Spin"/>
+      </item>
+      <item row="9" column="1">
+       <widget class="QSpinBox" name="Dly_SwitchInData_Spin"/>
+      </item>
+      <item row="10" column="1">
+       <widget class="QSpinBox" name="Dly_SwitchOutData_Spin"/>
       </item>
      </layout>
     </item>

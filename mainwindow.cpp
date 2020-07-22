@@ -24,7 +24,7 @@ MainWindow::~MainWindow()
  */
 void MainWindow::on_actionRun_triggered()
 {
-    if (concurrent_running)
+    if (concurrent_using)
     {
         qDebug() << "极速运行中，请先停下";
         return ;
@@ -48,17 +48,30 @@ void MainWindow::on_actionRun_triggered()
  */
 void MainWindow::on_actionRun_Extremly_triggered()
 {
-    if (concurrent_running)
+    if (concurrent_using)
     {
         // 关闭极速运行
         /* 这里不直接终止子线程
          * 而是修改信号量，告知某次clock结束后停止运行
          */
-        concurrent_running = false;
+        concurrent_using = false;
+        runtimer->stop();
     }
-    else
+    else // 开启极速运行
     {
+        // 需要初始化
+        if (current_layer == 0)
+        {
+            initFlowControl();
+        }
+        if (concurrent_running)
+        {
+            qDebug() << "极速运行中，请稍后再试";
+            return ;
+        }
+
         // 开启极速运行
+        concurrent_using = true;
         concurrent_running = true;
         QtConcurrent::run(this, &MainWindow::runFlowControl);
         runtimer->start();
@@ -180,7 +193,7 @@ void MainWindow::splitMap2Queue(FeatureMap *map, Kernel *kernel, FIFO &queue)
                 + (packet->CubeID << 8)
                 + (packet->SubID);
         packet->points = vec;
-        packet->resetDelay(Dly_Map2RegFIFO);
+        packet->resetDelay(Dly_Input2RegFIFO);
         queue.push_back(packet);
     }
 }
@@ -387,14 +400,19 @@ void MainWindow::initFlowControl()
     feature_map = new FeatureMap(0, MAP_SIDE_MAX, MAP_CHANNEL_DEFULT);
     start_time = clock();
 
-    Dly_Map2RegFIFO = ui->Dly_Map2RegFIFO_Spin->value();
+    Dly_Input2RegFIFO = ui->Dly_Map2RegFIFO_Spin->value();
     Dly_inReqFIFO = ui->Dly_inReqFIFO_Spin->value();
     Dly_onPick = ui->Dly_onPick_Spin->value();
     Dly_inConv = ui->Dly_inConv_Spin->value();
     Dly_Conv2SndFIFO = ui->Dly_Conv2SndFIFO_Spin->value();
     Dly_inSndFIFO = ui->Dly_inSndFIFO_Spin->value();
     Dly_SndPipe = ui->Dly_SndPipe_Spin->value();
-    Dly_inSwitch = ui->Dly_inSwitch_Spin->value();
+    Dly_SwitchInFIFO = ui->Dly_SwitchInFIFO_Spin->value();
+    Dly_SwitchOutFIFO = ui->Dly_SwitchOutFIFO_Spin->value();
+    Dly_SwitchInData = ui->Dly_SwitchInData_Spin->value();
+    Dly_SwitchOutData = ui->Dly_SwitchOutData_Spin->value();
+    Dly_inSwitch = Dly_SwitchInFIFO + Dly_SwitchOutFIFO
+            + Dly_SwitchInData + Dly_SwitchOutData;
     Dly_Switch2NextPE = ui->Dly_Switch2NextPE_Spin->value();
     
     PacketPointCount = ui->PacketPointCount_Spin->value();
@@ -409,16 +427,15 @@ void MainWindow::initFlowControl()
  */
 void MainWindow::runFlowControl()
 {
-    while (concurrent_running)
+    while (concurrent_using)
     {
         inClock();
-        if (STEP_MODE)
-            getchar();
 
         // 如果超过了最后一层，则退出
         if (current_layer >= MAX_LAYER && feature_map)
             break;
     }
+    concurrent_running = false;
 }
 
 /**
@@ -635,8 +652,11 @@ void MainWindow::dataTransfer()
         }
 
         if (packet->view)
+        {
             packet->view->deleteLater();
-        delete packet;
+            packet->view = nullptr;
+        }
+        packet->deleteLater();
         DEB("SndFIFO calculated\n");
         has_transfered = true;
     }
@@ -724,7 +744,7 @@ void MainWindow::dataTransfer()
  */
 void MainWindow::clockGoesBy()
 {
-    if (Dly_Map2RegFIFO && layer_start_clock + Dly_Map2RegFIFO >= global_clock)
+    if (Dly_Input2RegFIFO && layer_start_clock + Dly_Input2RegFIFO >= global_clock)
     {
         for (unsigned int i = 0; i < StartFIFO.size(); i++)
         {

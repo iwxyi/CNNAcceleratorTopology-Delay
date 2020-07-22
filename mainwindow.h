@@ -87,14 +87,18 @@ private:
     int Switch_FullBandwidth = 200; // Switch传输到下一层的：?*8B
 
     // 各种delay
-    int Dly_Map2RegFIFO = 1;   // 每个数据到ReqFIFO里面的delay
+    int Dly_Input2RegFIFO = 1; // 每个数据到ReqFIFO里面的delay
     int Dly_inReqFIFO = 0;     // ReqFIFO中的delay
     int Dly_onPick = 1;        // ReqQueue里每个数据Pick的delay
     int Dly_inConv = 1;        // 在Conv中的delay
     int Dly_Conv2SndFIFO = 1;  // 卷积后进入SndFIFO的delay
     int Dly_inSndFIFO = 1;     // 在SndFIFO的delay
     int Dly_SndPipe = 1;       // SndFIFO发送到Switch的delay
-    int Dly_inSwitch = 0;      // 在switch中的delay
+    int Dly_SwitchInFIFO = 1;  // Switch中进FIFO的delay
+    int Dly_SwitchOutFIFO = 1; // Switch中出FIFO的delay
+    int Dly_SwitchInData = 1;  // Switch中进Dat的delay
+    int Dly_SwitchOutData = 1; // Switch中进Dat的delay
+    int Dly_inSwitch = 0;      // 在switch中总的delay，为上四项相加
     int Dly_Switch2NextPE = 1; // Send至下一层PE的delay
 
     // 运行数值
@@ -108,7 +112,8 @@ private:
     ClockType global_clock = 0;
     int layer_start_clock = 0;
     clock_t start_time;
-    bool concurrent_running = false; // 高并发运行
+    bool concurrent_using = false; // 是否继续高并发运行
+    bool concurrent_running = false; // 并发线程是否已经结束
     // 某一个clock是否有数据流传输，若有则继续重新判断整个传输流程
     // 使用此flag解决单线程机制无法模拟多线程的多数据同步传输问题
     bool has_transfered = false;
