@@ -75,17 +75,21 @@ protected:
 
     DataPacketView* createPacketView(DataPacket* packet);
 
+    inline bool isConvCanReceiveInPicker(int index);
+    inline bool isSndFIFOCanReceiveInPicker();
+
 private:
     Ui::MainWindow *ui;
     QTimer *runtimer;
 
     // 各种模块
     int PacketPointCount = 2;       // 每个req数据包带有几个点的数量
-    int ReqFIFO_MaxSize = 24;       // ReqQueue数据量上限
+    int ReqFIFO_MaxSize = 256;      // ReqQueue数据量上限
     int ConvFIFO_MaxSize = 9;       // 卷积核存储的数据包最大的大小：?*8B*数量
+    int SndFIFO_MaxSize = 256;      // SndFIFO中数据量上限
     int Input_FullBandwidth = 256;  // Input=>Req的bandwidth
     int Picker_FullBandwidth = 256; // 1个clock进行pick的数据数量
-    int Conv_FullBandwidth = 256;   // Conv=>SndFIFO的bandwidth
+    int Conv_FullBandwidth = 32;    // Conv=>SndFIFO的bandwidth【这是其中一个的！！！】
     int Snd_FullBandwidth = 256;    // SndFIFO=>Switch的bandwidth
     int Switch_FullBandwidth = 256; // Switch传输到下一层的：?*8B
 

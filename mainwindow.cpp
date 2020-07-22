@@ -491,7 +491,11 @@ void MainWindow::dataTransfer()
 
         packet->resetDelay(Dly_inReqFIFO);
         DataPacket* req = packet;
-        createPacketView(req);
+        auto view = createPacketView(req);
+        if (view)
+        {
+            view->move(ui->ReqFIFO_Label->geometry().center());
+        }
         ReqFIFO.push_back(req);
         input_bandwdith--;
 
@@ -505,10 +509,10 @@ void MainWindow::dataTransfer()
     // ReqFIFI => ConvQueues
     int start_picker_target = picker_tagret; // 记录当前的picker的目标，避免全部一遍后的死循环
     bool round_picked = false; // 这一整圈有无pick。一圈无pick即使有bandwidth也退出
-    while (picker_bandwdith > 0 && ReqFIFO.size())
+    while (picker_bandwdith > 0 && ReqFIFO.size() && isSndFIFOCanReceiveInPicker())
     {
         // 如果卷积核数据数量已经达到了上限，则跳过这个kernel
-        if (/*ConvQueue[picker_tagret].size()+*/ConvWaitings[picker_tagret] >= ConvFIFO_MaxSize)
+        if (!isConvCanReceiveInPicker(picker_tagret))
         {
             pickNextTarget(); // pick到下一根
             if (picker_tagret == start_picker_target)
@@ -846,16 +850,17 @@ void MainWindow::updateViews()
     // 更新各种数值显示
     ui->ReqFIFOCount_Label->setText(QString("%1/%2").arg(ReqFIFO.size()).arg(ReqFIFO_MaxSize));
     ui->ReqDataCount_Label->setText(QString("%1/%2").arg(ReqFIFO.size()).arg(ReqFIFO_MaxSize));
+    ui->SndFIFOCount_Label->setText(QString("%1/%2").arg(SndFIFO.size()).arg(SndFIFO_MaxSize));
     ui->PickerBandwidth_Label->setText(QString("%1B").arg(Picker_FullBandwidth*8));
     ui->InputBandwidth_Label->setText(QString("%1B").arg(Input_FullBandwidth*8));
-    ui->ConvBandwidth_Label->setText(QString("%1B").arg(Conv_FullBandwidth*8));
+    ui->ConvBandwidth_Label->setText(QString("%1B * %2").arg(Conv_FullBandwidth*8).arg(layer_kernel));
     ui->SndBandwidth_Label->setText(QString("%1B").arg(Snd_FullBandwidth*8));
     ui->SwitchBandwidth_Label->setText(QString("%1B").arg(Switch_FullBandwidth*8));
 
     // 更新所有数据包的位置
     QPoint widget_pos(0, 0);
 
-    QPoint view_pos = widget_pos + ui->RegFIFO_Label->geometry().center();
+    QPoint view_pos = widget_pos + ui->ReqFIFO_Label->geometry().center();
     for (unsigned i = 0; i < ReqFIFO.size(); i++)
     {
         DataPacket* packet = ReqFIFO.at(i);
@@ -863,8 +868,8 @@ void MainWindow::updateViews()
             packet->view->mv(view_pos);
     }
 
-    view_pos = widget_pos + ui->RegFIFO_Label->geometry().bottomLeft();
-    view_pos.setX(view_pos.x() + ui->RegFIFO_Label->width()/2);
+    view_pos = widget_pos + ui->ReqFIFO_Label->geometry().bottomLeft();
+    view_pos.setX(view_pos.x() + ui->ReqFIFO_Label->width()/2);
     view_pos.setY(view_pos.y()+10);
     for (unsigned i = 0; i < PickFIFO.size(); i++)
     {
@@ -954,8 +959,21 @@ DataPacketView *MainWindow::createPacketView(DataPacket *packet)
     if (concurrent_running)
         return nullptr;
     DataPacketView* view = new DataPacketView(packet, ui->widget);
-    view->setToolTip(QString("Tag:%1, ImgID:%2, CubeID:%3, SubID: %4")
-                     .arg(packet->Tag).arg(packet->ImgID).arg(packet->CubeID).append(packet->SubID));
+    view->setToolTip(QString("Tag:%1, ImgID:%2, CubeID:%3, SubID:%4")
+                     .arg(packet->Tag).arg(packet->ImgID).arg(packet->CubeID).arg(packet->SubID));
     view->show();
     return view;
+}
+
+bool MainWindow::isConvCanReceiveInPicker(int index)
+{
+    int delay = Dly_onPick;
+    return (int)ConvFIFOs[index].size() + ConvWaitings[index] - Conv_FullBandwidth * delay < ConvFIFO_MaxSize;
+}
+
+bool MainWindow::isSndFIFOCanReceiveInPicker()
+{
+    int delay = Dly_onPick + Dly_inConv + Dly_Conv2SndFIFO + Dly_inSndFIFO;
+    int bandwidth = qMin(Conv_FullBandwidth, Snd_FullBandwidth);
+    return (int)SndFIFO.size() - bandwidth * delay < SndFIFO_MaxSize;
 }

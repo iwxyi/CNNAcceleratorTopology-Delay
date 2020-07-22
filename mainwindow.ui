@@ -202,7 +202,7 @@
          <number>1</number>
         </property>
         <property name="value">
-         <number>24</number>
+         <number>256</number>
         </property>
        </widget>
       </item>
@@ -345,7 +345,7 @@
       <property name="styleSheet">
        <string notr="true">background: url(:/images/PE)</string>
       </property>
-      <widget class="QLabel" name="RegFIFO_Label">
+      <widget class="QLabel" name="ReqFIFO_Label">
        <property name="geometry">
         <rect>
          <x>363</x>
@@ -624,10 +624,10 @@ border-radius:3px;</string>
       <widget class="QLabel" name="ConvBandwidth_Label">
        <property name="geometry">
         <rect>
-         <x>370</x>
+         <x>353</x>
          <y>340</y>
-         <width>54</width>
-         <height>12</height>
+         <width>91</width>
+         <height>20</height>
         </rect>
        </property>
        <property name="styleSheet">
