@@ -96,7 +96,7 @@ void MainWindow::onTimerTimeOut()
     }
 
     inClock();
-    updatePacketPos();
+    updateViews();
 }
 
 /**
@@ -417,8 +417,11 @@ void MainWindow::initFlowControl()
     
     PacketPointCount = ui->PacketPointCount_Spin->value();
     ReqFIFO_MaxSize = ui->ReqFIFO_MaxSize_Spin->value();
-    Picker_FullBandwidth = ui->Picker_FullBandwidth_Spin->value();
     ConvFIFO_MaxSize = ui->ConvsFIFO_MaxSize_Spin->value();
+    Input_FullBandwidth = ui->Input_FullBandwidth_Spin->value();
+    Picker_FullBandwidth = ui->Picker_FullBandwidth_Spin->value();
+    Conv_FullBandwidth = ui->Conv_FullBandwidth_Spin->value();
+    Snd_FullBandwidth = ui->Snd_FullBandwidth_Spin->value();
     Switch_FullBandwidth = ui->Switch_FullBandwidth_Spin->value();
 }
 
@@ -445,7 +448,10 @@ void MainWindow::inClock()
 {
     //    getchar(); // 使用阻塞式输入来让一个clock一个clock的走过去
     global_clock++;
+    input_bandwdith = Input_FullBandwidth;
     picker_bandwdith = Picker_FullBandwidth; // bandwidth满载
+    conv_bandwidth = Conv_FullBandwidth;
+    snd_bandwidth = Snd_FullBandwidth;
     switch_bandwidth = Switch_FullBandwidth;
 
     // 开启新的一层，分割特征图
@@ -477,7 +483,7 @@ void MainWindow::dataTransfer()
     // 特征图的点到ReqFIFO和DatLatch
     // 由于ReqFIFO在pick后，有指针指向data，data立马跟着出来
     // 两个是连续的，应该可以不用分开，只使用一个队列
-    while (ReqFIFO.size() < ReqFIFO_MaxSize && !StartFIFO.empty())
+    while (ReqFIFO.size() < ReqFIFO_MaxSize && !StartFIFO.empty() && input_bandwdith > 0)
     {
         DataPacket* packet = StartFIFO.front();
         StartFIFO.erase(StartFIFO.begin()); // 删除首元素
@@ -486,6 +492,7 @@ void MainWindow::dataTransfer()
         DataPacket* req = packet;
         createPacketView(req);
         ReqFIFO.push_back(req);
+        input_bandwdith--;
 
         /*DataPacket* data = new DataPacket(packet->data);
             data->Tag = req->Tag;
@@ -579,10 +586,10 @@ void MainWindow::dataTransfer()
 
 
     // 每个 ConvQueue
-    for (int i = 0; i < layer_kernel; i++)
+    for (int i = 0; i < layer_kernel && conv_bandwidth > 0; i++)
     {
         FIFO& queue = ConvFIFOs[i];
-        for (int j = 0; j < queue.size(); j++)
+        for (int j = 0; j < queue.size() && conv_bandwidth > 0; j++)
         {
             DataPacket* packet = queue.at(j);
             if (!packet->isDelayFinished())
@@ -593,6 +600,7 @@ void MainWindow::dataTransfer()
             Conv2SndFIFO.push_back(packet);
             packet->resetDelay(Dly_Conv2SndFIFO);
             has_transfered = true;
+            conv_bandwidth--;
             DEB("Conv %d => SndFIFO\n", i);
         }
     }
@@ -648,7 +656,10 @@ void MainWindow::dataTransfer()
 
             auto view = createPacketView(resultPacket);
             if (view)
+            {
                 view ->setColor(Qt::green);
+                view->move(ui->SndFIFO_Label->geometry().center());
+            }
         }
 
         if (packet->view)
@@ -666,7 +677,7 @@ void MainWindow::dataTransfer()
 
     // SndPipe存储的就是全部的结果了
     // SndPipe (SndFIFO => Switch)
-    for (int i = 0; i < SndPipe.size(); i++)
+    for (int i = 0; i < SndPipe.size() && snd_bandwidth > 0; i++)
     {
         DataPacket* packet = SndPipe.at(i);
         if (!packet->isDelayFinished())
@@ -675,6 +686,7 @@ void MainWindow::dataTransfer()
         SndPipe.erase(SndPipe.begin() + i--);
         SwitchFIFO.push_back(packet);
         packet->resetDelay(Dly_inSwitch);
+        snd_bandwidth--;
         DEB("SndFIFO => Switch delay\n");
         has_transfered = true;
     }
@@ -683,10 +695,8 @@ void MainWindow::dataTransfer()
     // -------------------- Switch分割线 --------------------
 
     // Switch发送至下一层
-    for (int i = 0; i < SwitchFIFO.size(); i++)
+    for (int i = 0; i < SwitchFIFO.size() && switch_bandwidth > 0; i++)
     {
-        if (switch_bandwidth <= 0)
-            break;
         DataPacket* packet = SwitchFIFO.at(i);
         if (!packet->isDelayFinished())
             break;
@@ -823,9 +833,19 @@ void MainWindow::clockGoesBy()
 /**
  * 设置每一个DataPacket的位置
  */
-void MainWindow::updatePacketPos()
+void MainWindow::updateViews()
 {
-    QPoint widget_pos(ui->widget->pos().x(), 50);
+    // 更新各种数值显示
+    ui->ReqFIFOCount_Label->setText(QString("%1/%2").arg(ReqFIFO.size()).arg(ReqFIFO_MaxSize));
+    ui->ReqDataCount_Label->setText(QString("%1/%2").arg(ReqFIFO.size()).arg(ReqFIFO_MaxSize));
+    ui->PickerBandwidth_Label->setText(QString("%1B").arg(Picker_FullBandwidth*8));
+    ui->InputBandwidth_Label->setText(QString("%1B").arg(Input_FullBandwidth*8));
+    ui->ConvBandwidth_Label->setText(QString("%1B").arg(Conv_FullBandwidth*8));
+    ui->SndBandwidth_Label->setText(QString("%1B").arg(Snd_FullBandwidth*8));
+    ui->SwitchBandwidth_Label->setText(QString("%1B").arg(Switch_FullBandwidth*8));
+
+    // 更新所有数据包的位置
+    QPoint widget_pos(0, 0);
 
     QPoint view_pos = widget_pos + ui->RegFIFO_Label->geometry().center();
     for (unsigned i = 0; i < ReqFIFO.size(); i++)
@@ -925,7 +945,7 @@ DataPacketView *MainWindow::createPacketView(DataPacket *packet)
 {
     if (concurrent_running)
         return nullptr;
-    DataPacketView* view = new DataPacketView(packet, this);
+    DataPacketView* view = new DataPacketView(packet, ui->widget);
     view->setToolTip(QString("Tag:%1, ImgID:%2, CubeID:%3, SubID: %4")
                      .arg(packet->Tag).arg(packet->ImgID).arg(packet->CubeID).append(packet->SubID));
     view->show();

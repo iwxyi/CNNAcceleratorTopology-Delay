@@ -69,7 +69,7 @@ protected:
 
     void clockGoesBy();
 
-    void updatePacketPos();
+    void updateViews();
 
     void finishFlowControl();
 
@@ -82,9 +82,12 @@ private:
     // 各种模块
     int PacketPointCount = 2;       // 每个req数据包带有几个点的数量
     int ReqFIFO_MaxSize = 24;       // ReqQueue数据量上限
-    int Picker_FullBandwidth = 256; // 1个clock进行pick的数据数量
     int ConvFIFO_MaxSize = 9;       // 卷积核存储的数据包最大的大小：?*8B*数量
-    int Switch_FullBandwidth = 200; // Switch传输到下一层的：?*8B
+    int Input_FullBandwidth = 256;  // Input=>Req的bandwidth
+    int Picker_FullBandwidth = 256; // 1个clock进行pick的数据数量
+    int Conv_FullBandwidth = 256;   // Conv=>SndFIFO的bandwidth
+    int Snd_FullBandwidth = 256;    // SndFIFO=>Switch的bandwidth
+    int Switch_FullBandwidth = 256; // Switch传输到下一层的：?*8B
 
     // 各种delay
     int Dly_Input2RegFIFO = 1; // 每个数据到ReqFIFO里面的delay
@@ -117,9 +120,14 @@ private:
     // 某一个clock是否有数据流传输，若有则继续重新判断整个传输流程
     // 使用此flag解决单线程机制无法模拟多线程的多数据同步传输问题
     bool has_transfered = false;
+
+    // 各种bandwidth
+    int input_bandwdith = Input_FullBandwidth;
     int picker_bandwdith = Picker_FullBandwidth; // pick的最大bandwidth
-    int picker_tagret = 0; // picker下一次pick的目标，0~layer_kernel-1。如果不行，则跳过
+    int conv_bandwidth = Conv_FullBandwidth;
+    int snd_bandwidth = Snd_FullBandwidth;
     int switch_bandwidth = Switch_FullBandwidth; // switch发送的最大速度
+    int picker_tagret = 0; // picker下一次pick的目标，0~layer_kernel-1。如果不行，则跳过
 
     int current_map_side = 0; // 当前图像的大小
     long long total_points = 0; // 总共参与卷积的点
