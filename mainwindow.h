@@ -109,6 +109,7 @@ private:
     int layer_channel = 3;   // 当前层图片深度，即channel数量
     int layer_kernel = 3;    // 当前层的kernel总数量
     int finished_kernel = 0; // 当前层结束的kernel数量
+    int layer_side = 224;    // 当前层的特征图大小
     std::vector<pthread_t*> conv_thread;   // 子线程对象
 
     // 从一开始到现在经过的clock

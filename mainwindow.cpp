@@ -185,11 +185,11 @@ void MainWindow::splitMap2Queue(FeatureMap *map, Kernel *kernel, FIFO &queue)
         // SubID: 小方块第几面
         // 其实感觉还少了更深一层的ID，但是这个ID也无所谓的，只要有了就行
         DataPacket* packet = new DataPacket(m[y][x][z]);
-        packet->ImgID = (INT8)z;
-        packet->CubeID = (INT8)y;
-        packet->SubID = (INT8)x;
+        packet->ImgID = current_layer;
+        packet->CubeID = (INT8)y * side + (INT8)x;
+        packet->SubID = (INT8)z;
         // Tag暂时为三个ID拼接，确保每个packet的Tag都不相同
-        packet->Tag = (packet->ImgID << 16)
+        packet->Tag = (packet->ImgID << 24)
                 + (packet->CubeID << 8)
                 + (packet->SubID);
         packet->points = vec;
@@ -209,6 +209,7 @@ void MainWindow::startNewLayer()
     layer_start_clock = global_clock;
     layer_channel = getKernelCount(current_layer-1);
     layer_kernel = getKernelCount(current_layer);
+    layer_side = feature_map->side;
     picker_bandwdith = Picker_FullBandwidth;
     picker_tagret = 0;
     total_points = 0;
@@ -649,8 +650,15 @@ void MainWindow::dataTransfer()
 
             // 每一个点和前面3*3*kernel-1个点进行运算，得到一个全新的结果点
             // 结果点要重新编号，规则和之前的一样，而这也是下一层的编号
-            TagType tag = (point.z << 16) + (point.y << 8) + point.x;
-            DataPacket* resultPacket = new DataPacket(tag, (INT8)point.z, (INT8)point.y, (INT8)point.x);
+            int next_side = layer_side - KERNEL_SIDE + 1;
+            DataPacket* resultPacket = new DataPacket(Request); // 参数应该是结果，这里用request代替
+            resultPacket->ImgID = current_layer;
+            resultPacket->CubeID = (INT8)point.y + next_side + (INT8)point.x;
+            resultPacket->SubID = (INT8)point.z;
+            // Tag暂时为三个ID拼接，确保每个packet的Tag都不相同
+            resultPacket->Tag = (resultPacket->ImgID << 24)
+                    + (resultPacket->CubeID << 8)
+                    + (resultPacket->SubID);
             resultPacket->resetDelay(Dly_SndPipe);
             SndPipe.push_back(resultPacket);
 

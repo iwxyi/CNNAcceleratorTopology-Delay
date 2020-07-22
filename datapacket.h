@@ -12,6 +12,7 @@
 typedef int DataType;
 typedef int TagType;
 typedef INT8 IdType;
+typedef INT16 Id2Type;
 typedef INT8 PointVal;
 struct PointBean;
 typedef std::vector<PointBean> PointVec;
@@ -90,7 +91,7 @@ public:
     // 各种标识符
     TagType Tag = 0;
     IdType ImgID = 0;  // 被滑动图像
-    IdType CubeID = 0; // 一个小晶体
+    Id2Type CubeID = 0; // side*side个小晶体
     IdType SubID = 0;  // 小晶体内部每一小块
     DataType data = 0; // 具体存储的data
     int kernel_index = -1; // 准备发送到的kernel索引
